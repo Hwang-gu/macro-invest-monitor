@@ -154,6 +154,7 @@
     .weights div, .user-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1c2a44; }
     .user-row button { width: auto; padding: 6px 10px; font-size: .8rem; margin: 0; }
     .hint { color: #b7c3d4; font-size: .78rem; margin: 8px 0 12px; }
+    .ok { color: #9ad0a8; font-size: .85rem; min-height: 1.2em; margin-top: 8px; text-align: center; }
   </style>
 </head>
 <body>
@@ -177,6 +178,7 @@
         <label for="autoSign">Auto Sign in</label>
       </div>
       <div class="err" id="loginErr"></div>
+      <p class="hint">추가한 계정은 Qualification을 User로 두고 로그인합니다. ID와 PW가 맞으면 역할을 자동으로 맞춥니다.</p>
       <button class="primary" id="loginBtn" type="button">Sign in</button>
       <button class="ghost" id="adminBtn" type="button">Information</button>
     </section>
@@ -243,13 +245,14 @@
   <div id="userModal" class="modal-bg hidden">
     <div class="modal form">
       <h2>User Add</h2>
-      <p class="hint">이 브라우저에 저장됩니다. Qualification을 User로 두고 로그인하면 됩니다.</p>
+      <p class="hint">이 브라우저에 저장됩니다. 로그인할 때는 Qualification을 User로 두면 됩니다.</p>
       <div id="userList"></div>
       <label for="newUserId">ID</label>
       <input id="newUserId" autocomplete="off"/>
       <label for="newUserPw">PW</label>
       <input id="newUserPw" type="password" autocomplete="new-password"/>
       <div class="err" id="userErr"></div>
+      <div class="ok" id="userOk"></div>
       <button class="primary" id="addUserBtn" type="button">Add</button>
       <button class="ghost" id="closeUser" type="button">닫기</button>
     </div>
@@ -271,6 +274,22 @@
     }
     function allAuth() {
       return (BOOT.auth || []).concat(extraUsers());
+    }
+    function digest(text) {
+      if (typeof sha256 === "function") return String(sha256(text));
+      throw new Error("hash");
+    }
+    function matchAccount(id, pw) {
+      const typed = (id || "").trim();
+      if (!typed) return null;
+      return allAuth().find(a => {
+        if (String(a.id).toLowerCase() !== typed.toLowerCase()) return false;
+        try {
+          return digest(a.role + "|" + a.id + "|" + pw) === a.hash;
+        } catch {
+          return false;
+        }
+      }) || null;
     }
     function autoRecord() {
       try { return JSON.parse(localStorage.getItem(AUTO_KEY) || "null"); }
@@ -531,29 +550,46 @@
     }
 
     $("loginBtn").onclick = () => {
-      const role = $("role").value;
       const id = $("uid").value.trim();
       const pw = $("pw").value;
-      const h = sha256(role + "|" + id + "|" + pw);
-      const ok = allAuth().some(a => a.role === role && a.id === id && a.hash === h);
-      if (!ok) { $("loginErr").textContent = "Qualification / ID / PW 를 확인해 주세요."; return; }
+      let acc = null;
+      try { acc = matchAccount(id, pw); }
+      catch { $("loginErr").textContent = "로그인 구성을 확인할 수 없습니다. 페이지를 새로고침해 주세요."; return; }
+      if (!acc) {
+        const known = allAuth().some(a => String(a.id).toLowerCase() === id.toLowerCase());
+        $("loginErr").textContent = known
+          ? "PW가 다릅니다. 추가한 계정이면 Qualification은 User입니다."
+          : "ID / PW 를 확인해 주세요.";
+        return;
+      }
       $("loginErr").textContent = "";
-      if ($("autoSign").checked) saveAuto(role, id, h);
+      $("role").value = acc.role;
+      const h = digest(acc.role + "|" + acc.id + "|" + pw);
+      if ($("autoSign").checked) saveAuto(acc.role, acc.id, h);
       else clearAuto();
-      enter(role);
+      enter(acc.role);
     };
     $("addUserBtn").onclick = () => {
       const id = $("newUserId").value.trim();
       const pw = $("newUserPw").value;
       $("userErr").textContent = "";
+      $("userOk").textContent = "";
       if (!id || !pw) { $("userErr").textContent = "ID와 PW를 모두 입력해 주세요."; return; }
-      if (allAuth().some(a => a.id === id)) { $("userErr").textContent = "이미 있는 ID입니다."; return; }
+      if (allAuth().some(a => String(a.id).toLowerCase() === id.toLowerCase())) {
+        $("userErr").textContent = "이미 있는 ID입니다.";
+        return;
+      }
+      let hash;
+      try { hash = digest("User|" + id + "|" + pw); }
+      catch { $("userErr").textContent = "저장할 수 없습니다. 페이지를 새로고침해 주세요."; return; }
       const list = extraUsers();
-      list.push({ role: "User", id, hash: sha256("User|" + id + "|" + pw) });
-      saveExtraUsers(list);
+      list.push({ role: "User", id, hash });
+      try { saveExtraUsers(list); }
+      catch { $("userErr").textContent = "이 브라우저에 계정을 저장하지 못했습니다."; return; }
       $("newUserId").value = "";
       $("newUserPw").value = "";
       renderUsers();
+      $("userOk").textContent = "등록했습니다. 로그인에서 Qualification을 User로 두고 들어가면 됩니다.";
     };
     $("logoutBtn").onclick = () => {
       clearAuto();
@@ -563,6 +599,7 @@
     };
     $("userAddBtn").onclick = () => {
       $("userErr").textContent = "";
+      $("userOk").textContent = "";
       renderUsers();
       $("userModal").classList.remove("hidden");
     };
