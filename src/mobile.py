@@ -28,6 +28,31 @@ def _hash_account(role: str, user_id: str, pw: str) -> str:
     return hashlib.sha256(f"{role}|{user_id}|{pw}".encode("utf-8")).hexdigest()
 
 
+def _extra_user_records() -> list[dict[str, str]]:
+    path = ROOT / "data" / "ted_users.json"
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in data if isinstance(data, list) else []:
+        if not isinstance(item, dict):
+            continue
+        user_id = str(item.get("id", "")).strip()
+        hashed = str(item.get("hash", "")).strip().lower()
+        key = user_id.lower()
+        if not user_id or key in seen or len(hashed) != 64:
+            continue
+        if any(ch not in "0123456789abcdef" for ch in hashed):
+            continue
+        seen.add(key)
+        rows.append({"role": "User", "id": user_id, "hash": hashed})
+    return rows
+
+
 def _monthly_values(series: pd.Series, ndigits: int) -> list[float | None]:
     return [None if v != v else round(float(v), ndigits) for v in series]
 
@@ -106,7 +131,7 @@ def write_mobile_app(
         "auth": [
             {"role": a["role"], "id": a["id"], "hash": _hash_account(a["role"], a["id"], a["pw"])}
             for a in ted_accounts()
-        ],
+        ] + _extra_user_records(),
         "chart": _chart_bundle(panel) if panel is not None else {"dates": []},
         "events": _events_payload(),
         "present": present_briefing(report, channels),
@@ -118,6 +143,10 @@ def write_mobile_app(
         "__BOOT__", json.dumps(boot, ensure_ascii=False, default=str).replace("</", "<\\/")
     )
     (APP_DIR / "index.html").write_text(html, encoding="utf-8")
+    (APP_DIR / "users.json").write_text(
+        json.dumps(_extra_user_records(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     (APP_DIR / "latest.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
     )
@@ -151,7 +180,7 @@ def write_mobile_app(
         """self.addEventListener("install", e => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(clients.claim()));
 self.addEventListener("fetch", e => {
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+  e.respondWith(fetch(e.request, {cache: "no-store"}).catch(() => caches.match(e.request)));
 });
 """,
         encoding="utf-8",

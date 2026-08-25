@@ -37,7 +37,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/raw data/events.json data/reports/latest.json data/reports/app
+          git add data/raw data/events.json data/ted_users.json data/reports/latest.json data/reports/app
           git diff --cached --quiet || git commit -m "daily data $(date -u +%Y-%m-%d)"
           git push
       - name: Upload Pages artifact
