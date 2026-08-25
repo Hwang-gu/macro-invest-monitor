@@ -63,16 +63,44 @@
     .top small { color: #b7c3d4; font-size: .78rem; }
     .top-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
     .top-actions button { width: auto; margin: 0; padding: 6px 10px; font-size: .8rem; }
+    #app:not(.hidden) {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 72px);
+    }
+    #app.home .menus {
+      flex: 1;
+      justify-content: center;
+      margin: 0;
+    }
     .menus { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
     .menus button { text-align: center; letter-spacing: .16em; }
     .menus button.on { background: #1e4d8c; border-color: #6ea2e6; }
     .panel { line-height: 1.55; font-size: .95rem; }
     .panel p { margin: 0 0 12px; }
+    #present p, #future p { text-indent: 1.15em; }
+    .brief-title {
+      text-align: center; text-indent: 0 !important;
+      letter-spacing: .06em; margin-bottom: 16px !important;
+    }
+    .rate-list, .score-box { text-indent: 0; list-style: none; padding: 0; margin: 0 0 16px; }
+    .rate-list li, .score-row { padding: 5px 0; }
+    .score-box h3 { font-size: .92rem; letter-spacing: .06em; margin: 0 0 8px; font-weight: normal; }
+    .score-row { display: flex; justify-content: space-between; border-bottom: 1px solid #1c2a44; }
+    .footnote { color: #b7c3d4; font-size: .78rem; text-indent: 0 !important; margin-top: 16px !important; }
+    .chart-title {
+      text-align: center;
+      position: sticky; top: 0; z-index: 3;
+      background: #0b1220;
+      padding: 8px 0 6px;
+      font-size: .95rem;
+      letter-spacing: .06em;
+    }
     .chart-scroll {
       overflow-x: auto;
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
-      margin: 0 0 16px;
+      margin: 0 0 18px;
       padding-bottom: 4px;
     }
     .chart {
@@ -148,12 +176,19 @@
           <span class="dot" style="background:#e0a050"></span>지정학
           <span class="dot" style="background:#5aa0ff"></span>정책
         </div>
+        <h3 class="chart-title">이슈 타임라인</h3>
         <div class="chart-scroll"><div class="chart issues" id="chartIssues"></div></div>
+        <h3 class="chart-title">추세 비교</h3>
         <div class="chart-scroll"><div class="chart compare" id="chartCompare"></div></div>
+        <h3 class="chart-title">기준금리</h3>
         <div class="chart-scroll"><div class="chart" id="chartRates"></div></div>
+        <h3 class="chart-title">코스피 · 코스닥</h3>
         <div class="chart-scroll"><div class="chart" id="chartKorea"></div></div>
+        <h3 class="chart-title">나스닥</h3>
         <div class="chart-scroll"><div class="chart" id="chartNasdaq"></div></div>
+        <h3 class="chart-title">금</h3>
         <div class="chart-scroll"><div class="chart" id="chartGold"></div></div>
+        <h3 class="chart-title">비트코인</h3>
         <div class="chart-scroll"><div class="chart" id="chartBtc"></div></div>
       </div>
       <div id="present" class="panel hidden"></div>
@@ -236,12 +271,39 @@
       $("app").classList.toggle("hidden", id !== "app");
     }
 
+    function mdPara(text) {
+      let t = (text || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+      t = t.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+      return "<p>" + t + "</p>";
+    }
+
+    function scoreBox(scores, heading) {
+      if (!scores || !scores.length) return "";
+      const rows = scores.map(s => `<div class="score-row"><span>${s.name}</span><span>${s.band}</span></div>`).join("");
+      return `<div class="score-box"><h3>${heading}</h3>${rows}</div>`;
+    }
+
+    function renderPresent(data) {
+      if (!data || typeof data === "string") return mdPara(data || "");
+      const rates = (data.rates || []).map(r => `<li>· ${r.label} : ${r.value}</li>`).join("");
+      const paras = (data.paragraphs || []).map(mdPara).join("");
+      const note = data.footnote ? `<p class="footnote">${data.footnote}</p>` : "";
+      return `<p class="brief-title">${data.title || ""}</p>`
+        + (rates ? `<ul class="rate-list">${rates}</ul>` : "")
+        + paras
+        + scoreBox(data.scores, "상대 무게")
+        + note;
+    }
+
+    function renderFuture(data) {
+      if (!data || typeof data === "string") return mdPara(data || "");
+      const paras = (data.paragraphs || []).map(mdPara).join("");
+      const note = data.footnote ? `<p class="footnote">${data.footnote}</p>` : "";
+      return `<p class="brief-title">${data.title || ""}</p>` + paras + scoreBox(data.scores, "상대 무게") + note;
+    }
+
     function md(text) {
-      return (text || "").split("\n\n").map(p => {
-        let t = p.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
-        t = t.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
-        return "<p>" + t + "</p>";
-      }).join("");
+      return (text || "").split("\n\n").map(mdPara).join("");
     }
 
     function weightsHtml(w) {
@@ -314,7 +376,7 @@
       }));
     }
 
-    function chartLayout(title, yaxis, extra) {
+    function chartLayout(yaxis, extra) {
       const xaxis = {
         gridcolor: "#1c2a44", color: "#fff",
         rangeslider: {visible: true, bgcolor: "#10192b", thickness: 0.14},
@@ -332,10 +394,9 @@
         }
       };
       return Object.assign({
-        title,
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
         font: {color: "#fff", family: "Chosunilbo Myeongjo, serif", size: 11},
-        margin: {l: 46, r: 16, t: 64, b: 16},
+        margin: {l: 46, r: 16, t: 48, b: 16},
         legend: {orientation: "h", y: -0.42, font: {size: 10}},
         hovermode: "x unified",
         dragmode: "pan",
@@ -362,7 +423,6 @@
         };
       });
       Plotly.newPlot("chartIssues", traces, {
-        title: "이슈 타임라인 (막대를 누르면 이름)",
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
         font: {color: "#fff", family: "Chosunilbo Myeongjo, serif", size: 11},
         margin: {l: 58, r: 16, t: 40, b: 40},
@@ -391,46 +451,53 @@
         mode: "lines",
         line: {color: s.color, width: 1.8}
       })).concat(issueHover(100));
-      Plotly.newPlot("chartCompare", compare, chartLayout("추세 비교 (각자 최저=0, 최고=100)", {title: "상대", range: [-2, 108]}), PLOT_CFG);
+      Plotly.newPlot("chartCompare", compare, chartLayout({title: "상대", range: [-2, 108]}), PLOT_CFG);
 
       Plotly.newPlot("chartRates", [
         {x: c.dates, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
         {x: c.dates, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
-      ].concat(issueHover(6)), chartLayout("기준금리 (%)", {title: "%"}), PLOT_CFG);
+      ].concat(issueHover(6)), chartLayout({title: "%"}), PLOT_CFG);
 
       Plotly.newPlot("chartKorea", [
         {x: c.dates, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
         {x: c.dates, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
-      ], chartLayout("코스피·코스닥 (첫 관측=100)"), PLOT_CFG);
+      ], chartLayout({title: "종가"}), PLOT_CFG);
 
       Plotly.newPlot("chartNasdaq", [
         {x: c.dates, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: "#8fd19e"}}
-      ], chartLayout("나스닥 (첫 관측=100)"), PLOT_CFG);
+      ], chartLayout({title: "종가"}), PLOT_CFG);
 
       Plotly.newPlot("chartGold", [
         {x: c.dates, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: "#e2c36b"}}
-      ], chartLayout("금 (첫 관측=100)"), PLOT_CFG);
+      ], chartLayout({title: "USD"}), PLOT_CFG);
 
       Plotly.newPlot("chartBtc", [
         {x: c.dates, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: "#c9a27a"}}
-      ], chartLayout("비트코인 (첫 관측=100)"), PLOT_CFG);
+      ], chartLayout({title: "USD"}), PLOT_CFG);
     }
 
     function showHome() {
       ["past","present","future"].forEach(t => $(t).classList.add("hidden"));
       document.querySelectorAll(".menus button").forEach(b => b.classList.remove("on"));
+      $("app").classList.add("home");
     }
 
     function openTab(name) {
+      const btn = document.querySelector('.menus button[data-tab="' + name + '"]');
+      if (btn && btn.classList.contains("on")) {
+        showHome();
+        return;
+      }
+      $("app").classList.remove("home");
       ["past","present","future"].forEach(t => $(t).classList.toggle("hidden", t !== name));
       document.querySelectorAll(".menus button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
       if (name === "past") setTimeout(drawPast, 80);
     }
 
     function enter(role) {
-      $("who").textContent = BOOT.asof + " · " + role;
-      $("present").innerHTML = md(BOOT.present);
-      $("future").innerHTML = md(BOOT.future) + weightsHtml(BOOT.weights);
+      $("who").textContent = role;
+      $("present").innerHTML = renderPresent(BOOT.present);
+      $("future").innerHTML = renderFuture(BOOT.future) + weightsHtml(BOOT.weights);
       $("userAddBtn").classList.toggle("hidden", role !== "Manager");
       show("app");
       showHome();

@@ -26,18 +26,8 @@ def _hash_account(role: str, user_id: str, pw: str) -> str:
     return hashlib.sha256(f"{role}|{user_id}|{pw}".encode("utf-8")).hexdigest()
 
 
-def _norm_monthly(series: pd.Series) -> list[float | None]:
-    s = series.dropna()
-    if s.empty:
-        return [None] * len(series)
-    first = float(s.iloc[0])
-    out: list[float | None] = []
-    for v in series:
-        if v != v or v is None:
-            out.append(None)
-        else:
-            out.append(round(float(v) / first * 100.0, 2))
-    return out
+def _monthly_values(series: pd.Series, ndigits: int) -> list[float | None]:
+    return [None if v != v else round(float(v), ndigits) for v in series]
 
 
 def _chart_bundle(panel: pd.DataFrame) -> dict[str, Any]:
@@ -45,14 +35,10 @@ def _chart_bundle(panel: pd.DataFrame) -> dict[str, Any]:
     monthly = panel[cols].resample("ME").last()
     dates = [d.strftime("%Y-%m") for d in monthly.index]
     bundle: dict[str, Any] = {"dates": dates}
-    for key in ("us_ffr", "kr_call"):
+    digits = {"us_ffr": 3, "kr_call": 3, "kospi": 2, "kosdaq": 2, "nasdaq": 2, "gold": 2, "bitcoin": 1}
+    for key in ("us_ffr", "kr_call", "kospi", "kosdaq", "nasdaq", "gold", "bitcoin"):
         if key in monthly:
-            bundle[key] = [None if v != v else round(float(v), 3) for v in monthly[key]]
-        else:
-            bundle[key] = [None] * len(dates)
-    for key in ("kospi", "kosdaq", "nasdaq", "gold", "bitcoin"):
-        if key in monthly:
-            bundle[key] = _norm_monthly(monthly[key])
+            bundle[key] = _monthly_values(monthly[key], digits[key])
         else:
             bundle[key] = [None] * len(dates)
     return bundle
