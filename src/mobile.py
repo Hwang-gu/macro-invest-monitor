@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from typing import Any
 
 import numpy as np
@@ -12,6 +13,7 @@ from .narrative import future_briefing, present_briefing
 from .process import load_events
 
 TEMPLATE = ROOT / "src" / "ted_app.html"
+LOGO = ROOT / "src" / "logo.jpg"
 CAT_KO = {
     "war": "전쟁",
     "disease": "질병",
@@ -129,12 +131,22 @@ def write_mobile_app(
                 "background_color": "#070b14",
                 "theme_color": "#070b14",
                 "lang": "ko",
+                "icons": [
+                    {
+                        "src": "logo.jpg",
+                        "sizes": "512x512",
+                        "type": "image/jpeg",
+                        "purpose": "any",
+                    }
+                ],
             },
             ensure_ascii=False,
             indent=2,
         ),
         encoding="utf-8",
     )
+    if LOGO.exists():
+        shutil.copy2(LOGO, APP_DIR / "logo.jpg")
     (APP_DIR / "sw.js").write_text(
         """self.addEventListener("install", e => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(clients.claim()));

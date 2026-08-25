@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-title" content="Ted Investment"/>
   <meta name="theme-color" content="#070b14"/>
   <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" href="logo.jpg"/>
+  <link rel="apple-touch-icon" href="logo.jpg"/>
   <title>Ted Investment</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -39,6 +41,18 @@
     }
     h1, h2, p { margin: 0; }
     .brand { text-align: center; letter-spacing: .12em; font-size: 1.35rem; margin-bottom: 28px; }
+    .logo {
+      display: block;
+      width: 96px; height: 96px;
+      margin: 0 auto 14px;
+      border-radius: 22px;
+      object-fit: cover;
+    }
+    .brand-row {
+      display: flex; align-items: center; gap: 10px;
+      text-align: left; margin: 0; font-size: 1.15rem;
+    }
+    .brand-row .logo { width: 40px; height: 40px; margin: 0; border-radius: 10px; }
     label { display: block; font-size: .82rem; margin: 14px 0 6px; color: #d7dee8; }
     input, select, button {
       width: 100%; font-family: inherit; font-size: 1rem;
@@ -145,7 +159,10 @@
 <body>
   <div class="shell">
     <section id="login">
-      <div class="brand">Ted Investment</div>
+      <div class="brand">
+        <img class="logo" src="logo.jpg" alt="Ted Investment"/>
+        Ted Investment
+      </div>
       <label for="role">Qualification</label>
       <select id="role">
         <option value="Manager">Manager</option>
@@ -167,8 +184,13 @@
     <section id="app" class="hidden">
       <div class="top">
         <div>
-          <div class="brand" style="text-align:left;margin:0;font-size:1.15rem">Ted Investment</div>
-          <small id="who"></small>
+          <div class="brand brand-row">
+            <img class="logo" src="logo.jpg" alt="Ted Investment"/>
+            <div>
+              <div>Ted Investment</div>
+              <small id="who"></small>
+            </div>
+          </div>
         </div>
         <div class="top-actions">
           <button class="ghost hidden" id="userAddBtn" type="button">User Add</button>

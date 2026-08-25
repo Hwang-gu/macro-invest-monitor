@@ -5,5 +5,13 @@
   "display": "standalone",
   "background_color": "#070b14",
   "theme_color": "#070b14",
-  "lang": "ko"
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
 }
