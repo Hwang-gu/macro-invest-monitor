@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import os
 
 ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT / ".env")
+load_dotenv(ROOT / ".env", override=True)
 
 START = date(2000, 1, 1)
 RAW_DIR = ROOT / "data" / "raw"
@@ -129,18 +129,16 @@ def bok_api_key() -> str | None:
 
 
 def ted_accounts() -> list[dict[str, str]]:
-    return [
-        {
-            "role": "Manager",
-            "id": os.getenv("TED_MANAGER_ID", "ted").strip() or "ted",
-            "pw": os.getenv("TED_MANAGER_PW", "TedInvest25!").strip() or "TedInvest25!",
-        },
-        {
-            "role": "User",
-            "id": os.getenv("TED_USER_ID", "user").strip() or "user",
-            "pw": os.getenv("TED_USER_PW", "TedUser25!").strip() or "TedUser25!",
-        },
-    ]
+    accounts: list[dict[str, str]] = []
+    manager_id = os.getenv("TED_MANAGER_ID", "").strip()
+    manager_pw = os.getenv("TED_MANAGER_PW", "").strip()
+    if manager_id and manager_pw:
+        accounts.append({"role": "Manager", "id": manager_id, "pw": manager_pw})
+    user_id = os.getenv("TED_USER_ID", "").strip()
+    user_pw = os.getenv("TED_USER_PW", "").strip()
+    if user_id and user_pw:
+        accounts.append({"role": "User", "id": user_id, "pw": user_pw})
+    return accounts
 
 
 def mail_settings() -> dict[str, str]:

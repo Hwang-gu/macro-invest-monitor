@@ -69,7 +69,11 @@
       background: #10192b; border: 1px solid #3a4d6b; border-radius: 14px;
       padding: 22px 20px; width: min(360px, 100%); text-align: center;
     }
-    .weights div { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1c2a44; }
+    .weights div, .user-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1c2a44; }
+    .user-row button { width: auto; padding: 6px 10px; font-size: .8rem; margin: 0; }
+    .admin-box { margin-top: 18px; padding-top: 14px; border-top: 1px solid #1c2a44; }
+    .admin-box h2 { font-size: 1rem; letter-spacing: .08em; margin-bottom: 8px; }
+    .hint { color: #b7c3d4; font-size: .78rem; margin: 8px 0 12px; }
   </style>
 </head>
 <body>
@@ -86,7 +90,7 @@
       <label for="pw">PW</label>
       <input id="pw" type="password" autocomplete="current-password"/>
       <div class="err" id="loginErr"></div>
-      <button class="primary" id="loginBtn" type="button">Enter</button>
+      <button class="primary" id="loginBtn" type="button">Sign in</button>
       <button class="ghost" id="adminBtn" type="button">관리자 안내</button>
     </section>
 
@@ -117,6 +121,17 @@
       </div>
       <div id="present" class="panel hidden"></div>
       <div id="future" class="panel hidden"></div>
+      <div id="adminBox" class="admin-box hidden">
+        <h2>User 계정</h2>
+        <p class="hint">Manager만 User를 추가할 수 있습니다. 이 브라우저에 저장되며, Qualification을 User로 두고 로그인하면 됩니다.</p>
+        <div id="userList"></div>
+        <label for="newUserId">User ID</label>
+        <input id="newUserId" autocomplete="off"/>
+        <label for="newUserPw">User PW</label>
+        <input id="newUserPw" type="password" autocomplete="new-password"/>
+        <div class="err" id="userErr"></div>
+        <button class="primary" id="addUserBtn" type="button">User 추가</button>
+      </div>
     </section>
   </div>
 
@@ -131,6 +146,38 @@
   <script>
     const BOOT = JSON.parse(document.getElementById("boot").textContent);
     const $ = (id) => document.getElementById(id);
+    const EXTRA_KEY = "ted_extra_users";
+
+    function extraUsers() {
+      try { return JSON.parse(localStorage.getItem(EXTRA_KEY) || "[]"); }
+      catch { return []; }
+    }
+    function saveExtraUsers(list) {
+      localStorage.setItem(EXTRA_KEY, JSON.stringify(list));
+    }
+    function allAuth() {
+      return (BOOT.auth || []).concat(extraUsers());
+    }
+    function renderUsers() {
+      const builtin = (BOOT.auth || []).filter(a => a.role === "User");
+      const extra = extraUsers();
+      const rows = [];
+      builtin.forEach(a => {
+        rows.push(`<div class="user-row"><span>${a.id} <small>(기본)</small></span></div>`);
+      });
+      extra.forEach((a, i) => {
+        rows.push(`<div class="user-row"><span>${a.id}</span><button type="button" data-del="${i}">삭제</button></div>`);
+      });
+      $("userList").innerHTML = rows.join("") || "<p class='hint'>아직 추가된 User가 없습니다.</p>";
+      $("userList").querySelectorAll("[data-del]").forEach(btn => {
+        btn.onclick = () => {
+          const list = extraUsers();
+          list.splice(Number(btn.dataset.del), 1);
+          saveExtraUsers(list);
+          renderUsers();
+        };
+      });
+    }
 
     function show(id) {
       $("login").classList.toggle("hidden", id !== "login");
@@ -199,6 +246,8 @@
       $("who").textContent = BOOT.asof + " · " + role;
       $("present").innerHTML = md(BOOT.present);
       $("future").innerHTML = md(BOOT.future) + weightsHtml(BOOT.weights);
+      $("adminBox").classList.toggle("hidden", role !== "Manager");
+      if (role === "Manager") renderUsers();
       show("app");
       openTab("past");
       sessionStorage.setItem("ted_role", role);
@@ -209,10 +258,23 @@
       const id = $("uid").value.trim();
       const pw = $("pw").value;
       const h = sha256(role + "|" + id + "|" + pw);
-      const ok = (BOOT.auth || []).some(a => a.role === role && a.id === id && a.hash === h);
+      const ok = allAuth().some(a => a.role === role && a.id === id && a.hash === h);
       if (!ok) { $("loginErr").textContent = "Qualification / ID / PW 를 확인해 주세요."; return; }
       $("loginErr").textContent = "";
       enter(role);
+    };
+    $("addUserBtn").onclick = () => {
+      const id = $("newUserId").value.trim();
+      const pw = $("newUserPw").value;
+      $("userErr").textContent = "";
+      if (!id || !pw) { $("userErr").textContent = "ID와 PW를 모두 입력해 주세요."; return; }
+      if (allAuth().some(a => a.id === id)) { $("userErr").textContent = "이미 있는 ID입니다."; return; }
+      const list = extraUsers();
+      list.push({ role: "User", id, hash: sha256("User|" + id + "|" + pw) });
+      saveExtraUsers(list);
+      $("newUserId").value = "";
+      $("newUserPw").value = "";
+      renderUsers();
     };
     $("logoutBtn").onclick = () => { sessionStorage.removeItem("ted_role"); show("login"); };
     $("adminBtn").onclick = () => $("adminModal").classList.remove("hidden");
