@@ -70,7 +70,7 @@ def run(mode: str = "daily", skip_collect: bool = False) -> dict:
     print("== 엑셀 장부·브리핑 ==")
     update_workbook(panel, features, report, channels, corr)
     write_html_report(BRIEF_HTML, report, channels, panel=panel)
-    write_mobile_app(report)
+    write_mobile_app(report, panel=panel, channels=channels)
     print(f"엑셀: {WORKBOOK_PATH}")
     print(f"브리핑: {BRIEF_HTML}")
     print(f"모바일앱: {APP_DIR / 'index.html'}")

@@ -128,6 +128,21 @@ def bok_api_key() -> str | None:
     return None
 
 
+def ted_accounts() -> list[dict[str, str]]:
+    return [
+        {
+            "role": "Manager",
+            "id": os.getenv("TED_MANAGER_ID", "ted").strip() or "ted",
+            "pw": os.getenv("TED_MANAGER_PW", "TedInvest25!").strip() or "TedInvest25!",
+        },
+        {
+            "role": "User",
+            "id": os.getenv("TED_USER_ID", "user").strip() or "user",
+            "pw": os.getenv("TED_USER_PW", "TedUser25!").strip() or "TedUser25!",
+        },
+    ]
+
+
 def mail_settings() -> dict[str, str]:
     return {
         "host": os.getenv("SMTP_HOST", "").strip(),

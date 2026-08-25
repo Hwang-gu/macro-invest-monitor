@@ -110,6 +110,129 @@ def gemini_commentary(report: dict[str, Any], channels: list[dict[str, Any]] | N
     return None
 
 
+def _fmt(v: float | None, suffix: str = "", digits: int = 2) -> str:
+    if v is None or v != v:
+        return "n/a"
+    return f"{v:.{digits}f}{suffix}"
+
+
+def present_briefing(report: dict[str, Any], channels: list[dict[str, Any]] | None = None) -> str:
+    """Present 탭: 거시·미시 현황을 서술형으로 정리합니다."""
+    r = report.get("regime") or {}
+    fc = report.get("forecast") or {}
+    asof = report.get("asof")
+    us3 = r.get("us_3m_chg_21")
+    try:
+        freeze = us3 is not None and us3 == us3 and abs(float(us3)) < 0.08
+        hiking = us3 is not None and us3 == us3 and float(us3) > 0.08
+    except (TypeError, ValueError):
+        freeze, hiking = False, False
+    semi = report.get("sector_scores") or {}
+    kr_semi = float(semi.get("kr_semi") or 0)
+    us_semi = float(semi.get("us_semi") or 0)
+    asset = report.get("asset_scores") or {}
+    kospi_s = float(asset.get("kospi") or 0)
+    kosdaq_s = float(asset.get("kosdaq") or 0)
+    nasdaq_s = float(asset.get("nasdaq") or 0)
+    gold_s = float(asset.get("gold") or 0)
+    btc_s = float(asset.get("bitcoin") or 0)
+
+    parts = [f"{asof} 기준 거시·미시 브리핑입니다."]
+
+    if freeze:
+        parts.append(
+            f"미국 단기금리는 최근 한 달 변화가 {_fmt(us3, '%p')}로 사실상 동결 구간에 가깝습니다. "
+            f"미국 기준금리(정책금리) {_fmt(r.get('us_3m'), '%')} 근처에서 움직이고, "
+            f"한국 기준금리는 {_fmt(r.get('kr_call'), '%')}입니다. "
+            "한·미 정책금리가 함께 멈춰 있으면 환율·자산 가격은 금리 자체보다 성장·지정학 이슈에 더 민감해지는 경향이 있습니다."
+        )
+    elif hiking:
+        parts.append(
+            f"미국 단기금리가 최근 한 달 {_fmt(us3, '%p')} 오르는 구간입니다. "
+            f"한국 기준금리는 {_fmt(r.get('kr_call'), '%')}입니다. "
+            "금리 상승은 성장주·비트코인에는 부담, 원화 약세가 겹치면 수출 대형주에는 실적 기대를 키울 수 있습니다."
+        )
+    else:
+        parts.append(
+            f"미국 3개월 {_fmt(r.get('us_3m'), '%')}, 10년 {_fmt(r.get('us_10y'), '%')}, "
+            f"한국 기준금리 {_fmt(r.get('kr_call'), '%')}, 원/달러 {_fmt(r.get('usdkkrw'), digits=1)}."
+        )
+
+    if r.get("krw_strong"):
+        parts.append("원/달러는 최근 하락(원화 강세)입니다. 수입 물가에는 우호적이나 코스피 수출 대형주 실적 눈높이에는 부담입니다.")
+    elif r.get("krw_weak"):
+        parts.append("원/달러는 최근 상승(원화 약세)입니다. 반도체·조선 등 수출주에는 우호, 수입 물가에는 부담입니다.")
+
+    if kr_semi > 0.02 or us_semi > 0.02 or nasdaq_s > kospi_s:
+        parts.append(
+            "미시적으로는 AI·고대역폭 메모리 수요가 이어지며 반도체 업종 점수가 상대적으로 높습니다. "
+            "한국에서는 SK하이닉스 대용 시계열이 그 경로를 대표하고, 대형 반도체 비중이 큰 코스피가 중소형(코스닥)보다 "
+            f"{'앞서' if kospi_s > kosdaq_s else '덜 앞선 채'} 움직이고 있습니다."
+        )
+    elif kosdaq_s > kospi_s + 0.02:
+        parts.append(
+            f"코스닥 점수({kosdaq_s:+.3f})가 코스피({kospi_s:+.3f})보다 높습니다. "
+            "대형주 주도라기보다 성장·중소형 쪽이 상대적으로 덜 눌린 국면으로 읽힙니다."
+        )
+    else:
+        parts.append(
+            f"주식 내부 상대 점수는 코스피 {kospi_s:+.3f}, 코스닥 {kosdaq_s:+.3f}, 나스닥 {nasdaq_s:+.3f}입니다."
+        )
+
+    parts.append(
+        f"안전자산·대안자산: 금 {gold_s:+.3f}, 비트코인 {btc_s:+.3f}. "
+        f"1순위 자산군은 {fc.get('stage1_asset_class') or report.get('asset_label')}입니다."
+    )
+
+    events = report.get("active_events") or []
+    if events:
+        names = ", ".join(e.get("name_ko") or "" for e in events[:5])
+        parts.append(f"진행 중 이슈({names})가 금·성장주·방산/조선 점수에 가점·감점으로 들어가 있습니다.")
+
+    if channels:
+        notable = sorted(channels, key=lambda c: abs(c.get("corr_0") or 0), reverse=True)[:2]
+        bits = [f"{c['title']} (동월 상관 {c['corr_0']:+.2f})" for c in notable]
+        parts.append("2000년 이후 데이터로 본 파급 경로: " + "; ".join(bits) + ".")
+
+    parts.append("연구용 서술이며 투자 권유가 아닙니다.")
+    return "\n\n".join(parts)
+
+
+def future_briefing(report: dict[str, Any], seasonal: dict[str, Any] | None = None) -> str:
+    """Future 탭: 상대 점수 기반 비중 방향을 짧게 제시합니다."""
+    fc = report.get("forecast") or {}
+    asset = report.get("asset_scores") or {}
+    seasonal = seasonal or {}
+    parts = [
+        f"{report.get('asof')} 기준, {fc.get('horizon') or '향후 약 21거래일'}의 상대 방향입니다. "
+        "절대 수익 예고가 아니라 지금 점수상 어디에 더 무게를 둘지입니다."
+    ]
+    pick = fc.get("stage1_asset_class") or report.get("asset_label")
+    parts.append(f"핵심 축은 **{pick}** 입니다.")
+    parts.append(
+        f"주식을 담는다면 **{fc.get('stage2_market') or '—'}**, "
+        f"업종은 **{fc.get('stage3_sector') or '—'}** 쪽 점수가 높습니다."
+    )
+    if fc.get("stage4_stock"):
+        parts.append(
+            f"코스피로 내려가면 대표 종목 대용은 {fc['stage4_stock']}"
+            + (f" ({fc.get('stage4_ticker')})" if fc.get("stage4_ticker") else "")
+            + " 입니다. 업종 ETF·바스켓이 더 안전합니다."
+        )
+    ranked = sorted(asset.items(), key=lambda kv: kv[1], reverse=True)
+    if ranked:
+        names = {"gold": "금", "bitcoin": "비트코인", "kospi": "코스피", "kosdaq": "코스닥", "nasdaq": "나스닥"}
+        line = ", ".join(f"{names.get(k, k)} {v:+.3f}" for k, v in ranked)
+        parts.append("자산군 상대 점수: " + line + ".")
+
+    if seasonal.get("note"):
+        parts.append(seasonal["note"])
+    if fc.get("reasons"):
+        parts.append("가점·감점 근거: " + " / ".join(fc["reasons"][:4]) + ".")
+    parts.append("과거 패턴과 점수는 미래를 보장하지 않습니다.")
+    return "\n\n".join(parts)
+
+
 def build_commentary(report: dict[str, Any], channels: list[dict[str, Any]] | None = None) -> dict[str, str]:
     rules = rule_commentary(report, channels)
     llm = gemini_commentary(report, channels)

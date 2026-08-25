@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="Ted Investment"/>
+  <meta name="theme-color" content="#070b14"/>
+  <link rel="manifest" href="manifest.json"/>
+  <title>Ted Investment</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    @font-face {
+      font-family: "Chosunilbo Myeongjo";
+      src: url("https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@1.0/Chosunilbo_myungjo.woff") format("woff");
+      font-weight: normal;
+      font-display: swap;
+    }
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100%;
+      background: #070b14;
+      color: #ffffff;
+      font-family: "Chosunilbo Myeongjo", "조선일보명조", "Times New Roman", serif;
+    }
+    body {
+      display: flex; justify-content: center;
+      padding: calc(12px + env(safe-area-inset-top)) 12px calc(20px + env(safe-area-inset-bottom));
+    }
+    .shell {
+      width: 100%; max-width: 430px;
+      min-height: calc(100vh - 32px);
+      background: #0b1220;
+      border: 1px solid #1c2a44;
+      border-radius: 22px;
+      padding: 22px 18px 28px;
+    }
+    h1, h2, p { margin: 0; }
+    .brand { text-align: center; letter-spacing: .12em; font-size: 1.35rem; margin-bottom: 28px; }
+    label { display: block; font-size: .82rem; margin: 14px 0 6px; color: #d7dee8; }
+    input, select, button {
+      width: 100%; font-family: inherit; font-size: 1rem;
+      border-radius: 10px; border: 1px solid #3a4d6b;
+      background: #10192b; color: #fff; padding: 12px 12px;
+    }
+    button { cursor: pointer; }
+    .primary { background: #1a3a6b; border-color: #2d5a9a; margin-top: 18px; }
+    .ghost { background: transparent; margin-top: 10px; }
+    .err { color: #ffb4b4; font-size: .85rem; min-height: 1.2em; margin-top: 8px; text-align: center; }
+    .hidden { display: none !important; }
+    .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+    .top small { color: #b7c3d4; font-size: .78rem; }
+    .logout { width: auto; padding: 6px 10px; font-size: .8rem; }
+    .menus { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .menus button { text-align: center; letter-spacing: .16em; }
+    .menus button.on { background: #1e4d8c; border-color: #6ea2e6; }
+    .panel { line-height: 1.55; font-size: .95rem; }
+    .panel p { margin: 0 0 12px; }
+    .chart { height: 280px; margin: 0 0 16px; }
+    .legend { font-size: .78rem; color: #c5d0de; margin: -6px 0 16px; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px 0 8px; }
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,.55);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal {
+      background: #10192b; border: 1px solid #3a4d6b; border-radius: 14px;
+      padding: 22px 20px; width: min(360px, 100%); text-align: center;
+    }
+    .weights div { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1c2a44; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section id="login">
+      <div class="brand">Ted Investment</div>
+      <label for="role">Qualification</label>
+      <select id="role">
+        <option value="Manager">Manager</option>
+        <option value="User">User</option>
+      </select>
+      <label for="uid">ID</label>
+      <input id="uid" autocomplete="username"/>
+      <label for="pw">PW</label>
+      <input id="pw" type="password" autocomplete="current-password"/>
+      <div class="err" id="loginErr"></div>
+      <button class="primary" id="loginBtn" type="button">Enter</button>
+      <button class="ghost" id="adminBtn" type="button">관리자 안내</button>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="top">
+        <div>
+          <div class="brand" style="text-align:left;margin:0;font-size:1.15rem">Ted Investment</div>
+          <small id="who"></small>
+        </div>
+        <button class="ghost logout" id="logoutBtn" type="button">Logout</button>
+      </div>
+      <nav class="menus">
+        <button type="button" data-tab="past">Past</button>
+        <button type="button" data-tab="present">Present</button>
+        <button type="button" data-tab="future">Future</button>
+      </nav>
+      <div id="past" class="panel hidden">
+        <p>2000년 이후 월말 기준입니다. 지수는 각자 첫 관측=100. 색 띠는 이슈 구간입니다.</p>
+        <div class="legend">
+          <span class="dot" style="background:#c45c5c"></span>전쟁
+          <span class="dot" style="background:#8b6bb3"></span>질병
+          <span class="dot" style="background:#3d9a6a"></span>신기술
+          <span class="dot" style="background:#888"></span>위기
+          <span class="dot" style="background:#3a7fc1"></span>정책
+        </div>
+        <div class="chart" id="chartRates"></div>
+        <div class="chart" id="chartAssets"></div>
+      </div>
+      <div id="present" class="panel hidden"></div>
+      <div id="future" class="panel hidden"></div>
+    </section>
+  </div>
+
+  <div id="adminModal" class="modal-bg hidden">
+    <div class="modal">
+      <p>Manager : tedhyun25@naver.com</p>
+      <button class="primary" id="closeAdmin" type="button">닫기</button>
+    </div>
+  </div>
+
+  <script type="application/json" id="boot">__BOOT__</script>
+  <script>
+    const BOOT = JSON.parse(document.getElementById("boot").textContent);
+    const $ = (id) => document.getElementById(id);
+
+    function show(id) {
+      $("login").classList.toggle("hidden", id !== "login");
+      $("app").classList.toggle("hidden", id !== "app");
+    }
+
+    function md(text) {
+      return (text || "").split("\n\n").map(p => {
+        let t = p.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+        t = t.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+        return "<p>" + t + "</p>";
+      }).join("");
+    }
+
+    function weightsHtml(w) {
+      const names = {gold:"금", bitcoin:"비트코인", kospi:"코스피", kosdaq:"코스닥", nasdaq:"나스닥"};
+      const rows = Object.entries(w || {}).sort((a,b)=>b[1]-a[1])
+        .map(([k,v]) => `<div><span>${names[k]||k}</span><span>${(v*100).toFixed(0)}%</span></div>`).join("");
+      return `<div class="weights">${rows}</div>`;
+    }
+
+    function issueShapes() {
+      const color = {war:"rgba(180,70,70,.28)", disease:"rgba(120,80,160,.28)", technology:"rgba(40,130,90,.25)",
+        financial_crisis:"rgba(90,90,90,.28)", policy:"rgba(50,110,170,.25)", geopolitics:"rgba(170,110,40,.25)"};
+      return (BOOT.events || []).map(ev => ({
+        type: "rect", xref: "x", yref: "paper",
+        x0: ev.start, x1: ev.end, y0: 0, y1: 1,
+        fillcolor: color[ev.category] || "rgba(120,120,120,.2)",
+        line: {width: 0}, layer: "below"
+      }));
+    }
+
+    function drawPast() {
+      const c = BOOT.chart || {};
+      const layoutBase = {
+        paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
+        font: {color: "#fff", family: "Chosunilbo Myeongjo, serif", size: 11},
+        margin: {l: 42, r: 18, t: 36, b: 40},
+        legend: {orientation: "h", y: -0.22, font: {size: 10}},
+        xaxis: {gridcolor: "#1c2a44", color: "#fff"},
+        yaxis: {gridcolor: "#1c2a44", color: "#fff"},
+        shapes: issueShapes(),
+        autosize: true
+      };
+      Plotly.newPlot("chartRates", [
+        {x: c.dates, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
+        {x: c.dates, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
+      ], Object.assign({}, layoutBase, {title: "기준금리 (%)", yaxis: {title: "%", gridcolor: "#1c2a44", color: "#fff"}}), {displayModeBar: false, responsive: true});
+
+      Plotly.newPlot("chartAssets", [
+        {x: c.dates, y: c.kospi, name: "코스피", type: "scatter", mode: "lines"},
+        {x: c.dates, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines"},
+        {x: c.dates, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines"},
+        {x: c.dates, y: c.gold, name: "금", type: "scatter", mode: "lines"},
+        {x: c.dates, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines"}
+      ], Object.assign({}, layoutBase, {title: "자산 (첫 관측=100)"}), {displayModeBar: false, responsive: true});
+    }
+
+    function openTab(name) {
+      ["past","present","future"].forEach(t => $(t).classList.toggle("hidden", t !== name));
+      document.querySelectorAll(".menus button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+      if (name === "past") setTimeout(drawPast, 30);
+    }
+
+    function enter(role) {
+      $("who").textContent = BOOT.asof + " · " + role;
+      $("present").innerHTML = md(BOOT.present);
+      $("future").innerHTML = md(BOOT.future) + weightsHtml(BOOT.weights);
+      show("app");
+      openTab("past");
+      sessionStorage.setItem("ted_role", role);
+    }
+
+    $("loginBtn").onclick = () => {
+      const role = $("role").value;
+      const id = $("uid").value.trim();
+      const pw = $("pw").value;
+      const h = sha256(role + "|" + id + "|" + pw);
+      const ok = (BOOT.auth || []).some(a => a.role === role && a.id === id && a.hash === h);
+      if (!ok) { $("loginErr").textContent = "Qualification / ID / PW 를 확인해 주세요."; return; }
+      $("loginErr").textContent = "";
+      enter(role);
+    };
+    $("logoutBtn").onclick = () => { sessionStorage.removeItem("ted_role"); show("login"); };
+    $("adminBtn").onclick = () => $("adminModal").classList.remove("hidden");
+    $("closeAdmin").onclick = () => $("adminModal").classList.add("hidden");
+    $("adminModal").onclick = (e) => { if (e.target.id === "adminModal") $("adminModal").classList.add("hidden"); };
+    document.querySelectorAll(".menus button").forEach(b => b.onclick = () => openTab(b.dataset.tab));
+    $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
+
+    const saved = sessionStorage.getItem("ted_role");
+    if (saved === "Manager" || saved === "User") enter(saved);
+    else show("login");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+  </script>
+</body>
+</html>

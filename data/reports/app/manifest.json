@@ -1,9 +1,9 @@
 {
-  "name": "매크로 배분 모니터",
-  "short_name": "매크로배분",
+  "name": "Ted Investment",
+  "short_name": "Ted Investment",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0f1720",
-  "theme_color": "#0f1720",
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
   "lang": "ko"
 }

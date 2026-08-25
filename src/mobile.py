@@ -1,154 +1,134 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
-from .config import APP_DIR
+import numpy as np
+import pandas as pd
+
+from .config import APP_DIR, ROOT, ted_accounts
+from .narrative import future_briefing, present_briefing
+from .process import load_events
+
+TEMPLATE = ROOT / "src" / "ted_app.html"
+CAT_KO = {
+    "war": "전쟁",
+    "disease": "질병",
+    "technology": "신기술",
+    "financial_crisis": "금융위기",
+    "geopolitics": "지정학",
+    "policy": "정책",
+}
 
 
-def _esc(text: str) -> str:
-    return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-    )
+def _hash_account(role: str, user_id: str, pw: str) -> str:
+    return hashlib.sha256(f"{role}|{user_id}|{pw}".encode("utf-8")).hexdigest()
 
 
-def _md_to_html(text: str) -> str:
-    parts = []
-    for para in (text or "").split("\n\n"):
-        line = _esc(para).replace("\n", "<br>")
-        while "**" in line:
-            if line.count("<b>") > line.count("</b>"):
-                line = line.replace("**", "</b>", 1)
-            else:
-                line = line.replace("**", "<b>", 1)
-        parts.append(f"<p>{line}</p>")
-    return "".join(parts)
+def _norm_monthly(series: pd.Series) -> list[float | None]:
+    s = series.dropna()
+    if s.empty:
+        return [None] * len(series)
+    first = float(s.iloc[0])
+    out: list[float | None] = []
+    for v in series:
+        if v != v or v is None:
+            out.append(None)
+        else:
+            out.append(round(float(v) / first * 100.0, 2))
+    return out
 
 
-def _bars(mapping: dict | None, labels: dict[str, str]) -> str:
-    if not mapping:
-        return ""
-    items = sorted(mapping.items(), key=lambda kv: kv[1], reverse=True)
-    peak = max(abs(v) for _, v in items) or 1.0
+def _chart_bundle(panel: pd.DataFrame) -> dict[str, Any]:
+    cols = [c for c in ["us_ffr", "kr_call", "kospi", "kosdaq", "nasdaq", "gold", "bitcoin"] if c in panel.columns]
+    monthly = panel[cols].resample("ME").last()
+    dates = [d.strftime("%Y-%m") for d in monthly.index]
+    bundle: dict[str, Any] = {"dates": dates}
+    for key in ("us_ffr", "kr_call"):
+        if key in monthly:
+            bundle[key] = [None if v != v else round(float(v), 3) for v in monthly[key]]
+        else:
+            bundle[key] = [None] * len(dates)
+    for key in ("kospi", "kosdaq", "nasdaq", "gold", "bitcoin"):
+        if key in monthly:
+            bundle[key] = _norm_monthly(monthly[key])
+        else:
+            bundle[key] = [None] * len(dates)
+    return bundle
+
+
+def _events_payload() -> list[dict[str, str]]:
+    events = load_events()
     rows = []
-    for key, val in items:
-        name = labels.get(key, key)
-        width = min(100.0, abs(val) / peak * 100.0)
-        side = "pos" if val >= 0 else "neg"
-        rows.append(
-            f'<div class="bar-row"><span>{_esc(name)}</span>'
-            f'<div class="bar-track"><i class="{side}" style="width:{width:.1f}%"></i></div>'
-            f"<em>{val:+.3f}</em></div>"
-        )
-    return "".join(rows)
+    for _, ev in events.iterrows():
+        rows.append({
+            "start": pd.Timestamp(ev["date"]).strftime("%Y-%m-%d"),
+            "end": pd.Timestamp(ev["end_date"]).strftime("%Y-%m-%d"),
+            "name": str(ev["name_ko"]),
+            "category": str(ev["category"]),
+            "category_ko": CAT_KO.get(str(ev["category"]), str(ev["category"])),
+        })
+    return rows
 
 
-def write_mobile_app(report: dict[str, Any]) -> None:
-    """휴대폰 홈 화면에 넣는 가벼운 웹앱을 만듭니다."""
+def _weights(scores: dict[str, float] | None) -> dict[str, float]:
+    if not scores:
+        return {}
+    keys = list(scores)
+    xs = np.array([float(scores[k]) for k in keys], dtype=float)
+    xs = np.clip(xs, -0.25, 0.25)
+    e = np.exp((xs - np.nanmax(xs)) * 10.0)
+    e = np.where(np.isfinite(e), e, 0.0)
+    total = float(e.sum()) or 1.0
+    return {k: round(float(w / total), 4) for k, w in zip(keys, e)}
+
+
+def _seasonal_note(panel: pd.DataFrame, asof: str) -> dict[str, Any]:
+    if "kosdaq" not in panel.columns:
+        return {}
+    m = panel["kosdaq"].resample("ME").last().pct_change().dropna()
+    if m.empty:
+        return {}
+    by_month = m.groupby(m.index.month).mean()
+    month = pd.Timestamp(asof).month
+    nxt = 1 if month == 12 else month + 1
+    avg = float(by_month.get(nxt, np.nan))
+    if avg != avg:
+        return {}
+    winter = month in {11, 12, 1, 2}
+    direction = "우상향" if avg > 0 else "우하향"
+    note = (
+        f"과거 코스닥의 {nxt}월 평균 월간 수익률은 {avg:+.1%}입니다. "
+        + ("겨울 전후 구간에 해당합니다. " if winter else "")
+        + f"단순 계절 평균일 뿐, 올해 {direction}을 단정하지 않습니다."
+    )
+    return {"next_month": nxt, "avg": avg, "note": note}
+
+
+def write_mobile_app(
+    report: dict[str, Any],
+    panel: pd.DataFrame | None = None,
+    channels: list[dict[str, Any]] | None = None,
+) -> None:
     APP_DIR.mkdir(parents=True, exist_ok=True)
-    fc = report.get("forecast") or {}
-    regime = report.get("regime") or {}
-    labels = {
-        "gold": "금",
-        "bitcoin": "비트코인",
-        "kospi": "코스피",
-        "kosdaq": "코스닥",
-        "nasdaq": "나스닥",
-        "us_semi": "미국 반도체",
-        "us_bio": "미국 바이오",
-        "us_finance": "미국 금융",
-        "us_robotics": "미국 로봇",
-        "kr_semi": "한국 반도체",
-        "kr_bio": "한국 바이오",
-        "kr_finance": "한국 금융",
-        "kr_ship": "한국 조선",
-        "kr_robot": "한국 로봇",
+    seasonal = _seasonal_note(panel, str(report.get("asof"))) if panel is not None else {}
+    boot = {
+        "asof": report.get("asof"),
+        "auth": [
+            {"role": a["role"], "id": a["id"], "hash": _hash_account(a["role"], a["id"], a["pw"])}
+            for a in ted_accounts()
+        ],
+        "chart": _chart_bundle(panel) if panel is not None else {"dates": []},
+        "events": _events_payload(),
+        "present": present_briefing(report, channels),
+        "future": future_briefing(report, seasonal),
+        "weights": _weights(report.get("asset_scores")),
+        "disclaimer": report.get("disclaimer"),
     }
-    events = "".join(
-        f'<li><b>{_esc(ev.get("name_ko") or "")}</b> <small>{_esc(ev.get("category") or "")}</small></li>'
-        for ev in (report.get("active_events") or [])
-    ) or "<li>진행 중으로 표시된 이슈가 없습니다.</li>"
-    reasons = "".join(f"<li>{_esc(r)}</li>" for r in (fc.get("reasons") or [])) or "<li>추가 근거 없음</li>"
-    stock = fc.get("stage4_stock") or "—"
-    if fc.get("stage4_ticker"):
-        stock = f"{fc['stage4_stock']} ({fc['stage4_ticker']})"
-    body = _md_to_html((report.get("commentary") or {}).get("display") or "")
-    payload = json.dumps(report, ensure_ascii=False, default=str).replace("</", "<\\/")
-
-    html = f"""<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="theme-color" content="#0f1720"/>
-  <link rel="manifest" href="manifest.json"/>
-  <title>매크로 배분 · { _esc(str(report.get("asof") or "")) }</title>
-  <style>
-    :root {{ color-scheme: dark; }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0f1720; color: #e8eef4; line-height: 1.45;
-      padding: calc(18px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));
-    }}
-    h1 {{ font-size: 1.15rem; margin: 0 0 4px; }}
-    .sub {{ color: #9db0c2; font-size: 0.85rem; margin-bottom: 16px; }}
-    .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }}
-    .card {{
-      background: #182230; border: 1px solid #2a3b4d; border-radius: 14px;
-      padding: 12px 14px; margin-bottom: 10px;
-    }}
-    .card.wide {{ grid-column: 1 / -1; }}
-    .label {{ font-size: 0.72rem; color: #8ea3b7; letter-spacing: .04em; }}
-    .value {{ font-size: 1.12rem; font-weight: 700; margin-top: 4px; }}
-    p {{ margin: 0 0 10px; }}
-    ul {{ margin: 0; padding-left: 18px; }}
-    li {{ margin: 6px 0; }}
-    .bar-row {{ display: grid; grid-template-columns: 7.5rem 1fr 3.4rem; gap: 8px; align-items: center; font-size: 0.82rem; margin: 6px 0; }}
-    .bar-track {{ height: 8px; background: #243445; border-radius: 99px; overflow: hidden; }}
-    .bar-track i {{ display: block; height: 100%; border-radius: 99px; }}
-    .bar-track .pos {{ background: #3dd68c; }}
-    .bar-track .neg {{ background: #e36b6b; }}
-    .metrics {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.86rem; }}
-    .metrics div {{ background: #121c27; border-radius: 10px; padding: 8px 10px; }}
-    .note {{ color: #8ea3b7; font-size: 0.78rem; }}
-  </style>
-</head>
-<body>
-  <h1>매크로 배분 모니터</h1>
-  <div class="sub">기준일 { _esc(str(report.get("asof") or "")) } · { _esc(str(fc.get("horizon") or "향후 약 21거래일")) }</div>
-  <div class="grid">
-    <div class="card"><div class="label">1. 자산군</div><div class="value">{_esc(str(fc.get("stage1_asset_class") or report.get("asset_label") or "—"))}</div></div>
-    <div class="card"><div class="label">2. 주식이라면</div><div class="value">{_esc(str(fc.get("stage2_market") or "—"))}</div></div>
-    <div class="card"><div class="label">3. 업종</div><div class="value">{_esc(str(fc.get("stage3_sector") or "—"))}</div></div>
-    <div class="card"><div class="label">4. 코스피 종목</div><div class="value">{_esc(stock)}</div></div>
-  </div>
-  <div class="card">
-    <div class="label">금리 · 환율</div>
-    <div class="metrics" style="margin-top:8px">
-      <div>미국 3개월<br><b>{regime.get("us_3m", float("nan")):.2f}%</b></div>
-      <div>미국 10년<br><b>{regime.get("us_10y", float("nan")):.2f}%</b></div>
-      <div>한국 기준금리<br><b>{regime.get("kr_call", float("nan")):.2f}%</b></div>
-      <div>원/달러<br><b>{regime.get("usdkkrw", float("nan")):.1f}</b></div>
-    </div>
-  </div>
-  <div class="card"><div class="label">오늘 해설</div>{body}</div>
-  <div class="card"><div class="label">근거</div><ul>{reasons}</ul></div>
-  <div class="card"><div class="label">진행 이슈</div><ul>{events}</ul></div>
-  <div class="card"><div class="label">자산군 점수</div>{_bars(report.get("asset_scores"), labels)}</div>
-  <div class="card"><div class="label">주식 시장 점수</div>{_bars(report.get("market_scores"), labels)}</div>
-  <div class="card"><div class="label">업종 점수</div>{_bars(report.get("sector_scores"), labels)}</div>
-  <p class="note">{_esc(str(report.get("disclaimer") or ""))} 홈 화면에 추가하면 앱처럼 열립니다. 매일 오전 7시(한국시간) 클라우드에서 갱신됩니다.</p>
-  <script type="application/json" id="report">{payload}</script>
-  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
-</body>
-</html>
-"""
+    html = TEMPLATE.read_text(encoding="utf-8").replace(
+        "__BOOT__", json.dumps(boot, ensure_ascii=False, default=str).replace("</", "<\\/")
+    )
     (APP_DIR / "index.html").write_text(html, encoding="utf-8")
     (APP_DIR / "latest.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
@@ -156,12 +136,12 @@ def write_mobile_app(report: dict[str, Any]) -> None:
     (APP_DIR / "manifest.json").write_text(
         json.dumps(
             {
-                "name": "매크로 배분 모니터",
-                "short_name": "매크로배분",
+                "name": "Ted Investment",
+                "short_name": "Ted Investment",
                 "start_url": "./",
                 "display": "standalone",
-                "background_color": "#0f1720",
-                "theme_color": "#0f1720",
+                "background_color": "#070b14",
+                "theme_color": "#070b14",
                 "lang": "ko",
             },
             ensure_ascii=False,

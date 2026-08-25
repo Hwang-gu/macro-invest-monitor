@@ -28,6 +28,10 @@ jobs:
       - name: Collect and rebuild
         env:
           BOK_API_KEY: ${{ secrets.BOK_API_KEY }}
+          TED_MANAGER_ID: ${{ secrets.TED_MANAGER_ID }}
+          TED_MANAGER_PW: ${{ secrets.TED_MANAGER_PW }}
+          TED_USER_ID: ${{ secrets.TED_USER_ID }}
+          TED_USER_PW: ${{ secrets.TED_USER_PW }}
         run: python -m src --mode daily
       - name: Save data for next run
         run: |
