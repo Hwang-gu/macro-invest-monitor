@@ -87,6 +87,21 @@
     .rate-list li, .score-row { padding: 5px 0; }
     .score-box h3 { font-size: .92rem; letter-spacing: .06em; margin: 0 0 8px; font-weight: normal; }
     .score-row { display: flex; justify-content: space-between; border-bottom: 1px solid #1c2a44; }
+    .alloc-box {
+      background: #152238;
+      border: 1px solid #2d5a9a;
+      border-radius: 12px;
+      padding: 14px 14px 6px;
+      margin: 18px 0 0;
+    }
+    .alloc-box h3 {
+      text-align: center;
+      text-indent: 0;
+      font-size: 1rem;
+      font-weight: normal;
+      letter-spacing: .08em;
+      margin: 0 0 10px;
+    }
     .footnote { color: #b7c3d4; font-size: .78rem; text-indent: 0 !important; margin-top: 16px !important; }
     .chart-title {
       text-align: center;
@@ -277,29 +292,19 @@
       return "<p>" + t + "</p>";
     }
 
-    function scoreBox(scores, heading) {
-      if (!scores || !scores.length) return "";
-      const rows = scores.map(s => `<div class="score-row"><span>${s.name}</span><span>${s.band}</span></div>`).join("");
-      return `<div class="score-box"><h3>${heading}</h3>${rows}</div>`;
-    }
-
     function renderPresent(data) {
       if (!data || typeof data === "string") return mdPara(data || "");
       const rates = (data.rates || []).map(r => `<li>· ${r.label} : ${r.value}</li>`).join("");
       const paras = (data.paragraphs || []).map(mdPara).join("");
-      const note = data.footnote ? `<p class="footnote">${data.footnote}</p>` : "";
       return `<p class="brief-title">${data.title || ""}</p>`
         + (rates ? `<ul class="rate-list">${rates}</ul>` : "")
-        + paras
-        + scoreBox(data.scores, "상대 무게")
-        + note;
+        + paras;
     }
 
     function renderFuture(data) {
       if (!data || typeof data === "string") return mdPara(data || "");
       const paras = (data.paragraphs || []).map(mdPara).join("");
-      const note = data.footnote ? `<p class="footnote">${data.footnote}</p>` : "";
-      return `<p class="brief-title">${data.title || ""}</p>` + paras + scoreBox(data.scores, "상대 무게") + note;
+      return `<p class="brief-title">${data.title || ""}</p>` + paras;
     }
 
     function md(text) {
@@ -309,8 +314,8 @@
     function weightsHtml(w) {
       const names = {gold:"금", bitcoin:"비트코인", kospi:"코스피", kosdaq:"코스닥", nasdaq:"나스닥"};
       const rows = Object.entries(w || {}).sort((a,b)=>b[1]-a[1])
-        .map(([k,v]) => `<div><span>${names[k]||k}</span><span>${(v*100).toFixed(0)}%</span></div>`).join("");
-      return `<div class="weights">${rows}</div>`;
+        .map(([k,v]) => `<div class="score-row"><span>${names[k]||k}</span><span>${(v*100).toFixed(0)}%</span></div>`).join("");
+      return `<div class="alloc-box"><h3>&lt;자산별 투자 비중&gt;</h3>${rows}</div>`;
     }
 
     const ISSUE = {
@@ -496,7 +501,7 @@
 
     function enter(role) {
       $("who").textContent = role;
-      $("present").innerHTML = renderPresent(BOOT.present);
+      $("present").innerHTML = renderPresent(BOOT.present) + weightsHtml(BOOT.weights);
       $("future").innerHTML = renderFuture(BOOT.future) + weightsHtml(BOOT.weights);
       $("userAddBtn").classList.toggle("hidden", role !== "Manager");
       show("app");

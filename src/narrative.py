@@ -126,18 +126,6 @@ def _asof_dot(asof: str | None) -> str:
         return raw
 
 
-def _band(v: float) -> str:
-    if v <= -0.10:
-        return "낮음"
-    if v <= -0.03:
-        return "다소 낮음"
-    if v < 0.03:
-        return "중립"
-    if v < 0.10:
-        return "다소 높음"
-    return "높음"
-
-
 def present_briefing(report: dict[str, Any], channels: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Present 탭: 거시·미시 현황을 서술형으로 정리합니다."""
     r = report.get("regime") or {}
@@ -155,8 +143,6 @@ def present_briefing(report: dict[str, Any], channels: list[dict[str, Any]] | No
     kospi_s = float(asset.get("kospi") or 0)
     kosdaq_s = float(asset.get("kosdaq") or 0)
     nasdaq_s = float(asset.get("nasdaq") or 0)
-    gold_s = float(asset.get("gold") or 0)
-    btc_s = float(asset.get("bitcoin") or 0)
 
     paragraphs: list[str] = []
     if freeze:
@@ -177,35 +163,28 @@ def present_briefing(report: dict[str, Any], channels: list[dict[str, Any]] | No
 
     if kr_semi > 0.02 or us_semi > 0.02 or nasdaq_s > kospi_s:
         paragraphs.append(
-            "미시적으로는 AI·고대역폭 메모리 수요가 이어지며 반도체 쪽 상대 무게가 큽니다. "
+            "미시적으로는 AI·고대역폭 메모리 수요가 이어지며 반도체 쪽이 상대적으로 앞섭니다. "
             "한국에서는 SK하이닉스 대용 시계열이 그 경로를 대표하고, 대형 반도체 비중이 큰 코스피가 중소형(코스닥)보다 "
             f"{'앞서' if kospi_s > kosdaq_s else '덜 앞선 채'} 움직이고 있습니다."
         )
     elif kosdaq_s > kospi_s + 0.02:
-        paragraphs.append("코스닥의 상대 무게가 코스피보다 큽니다. 대형주 주도라기보다 성장·중소형 쪽이 상대적으로 덜 눌린 국면으로 읽힙니다.")
+        paragraphs.append("코스닥이 코스피보다 상대적으로 덜 눌린 국면으로 읽힙니다. 대형주 주도라기보다 성장·중소형 쪽에 가깝습니다.")
     else:
-        paragraphs.append("주식 안에서는 코스피·코스닥·나스닥의 상대 무게가 크게 갈리지 않습니다.")
+        paragraphs.append("주식 안에서는 코스피·코스닥·나스닥이 크게 갈리지 않습니다.")
 
     pick = fc.get("stage1_asset_class") or report.get("asset_label")
     if pick:
-        paragraphs.append(f"지금 상대 무게가 가장 큰 자산군은 {pick}입니다.")
+        paragraphs.append(f"지금 비중이 가장 큰 자산군은 {pick}입니다.")
 
     events = report.get("active_events") or []
     if events:
         names = ", ".join(e.get("name_ko") or "" for e in events[:5])
-        paragraphs.append(f"진행 중 이슈({names})가 금·성장주·방산/조선 무게에 가점·감점으로 들어가 있습니다.")
+        paragraphs.append(f"진행 중 이슈({names})가 금·성장주·방산/조선 점수에 가점·감점으로 들어가 있습니다.")
 
     if channels:
         notable = sorted(channels, key=lambda c: abs(c.get("corr_0") or 0), reverse=True)[:2]
         bits = [f"{c['title']} (동월 상관 {c['corr_0']:+.2f})" for c in notable]
         paragraphs.append("2000년 이후 데이터로 본 파급 경로: " + "; ".join(bits) + ".")
-
-    names = {"gold": "금", "bitcoin": "비트코인", "kospi": "코스피", "kosdaq": "코스닥", "nasdaq": "나스닥"}
-    scores = [
-        {"name": names[k], "band": _band(float(v))}
-        for k, v in sorted(asset.items(), key=lambda kv: kv[1], reverse=True)
-        if k in names
-    ]
 
     return {
         "title": f"{_asof_dot(report.get('asof'))} Ted's Briefing",
@@ -216,19 +195,12 @@ def present_briefing(report: dict[str, Any], channels: list[dict[str, Any]] | No
             {"label": "원/달러", "value": _fmt(r.get("usdkkrw"), digits=1)},
         ],
         "paragraphs": paragraphs,
-        "scores": scores,
-        "footnote": (
-            "상대 무게는 자산끼리 견준 점수입니다. 대략 -0.25(낮음)에서 +0.25(높음) 사이이고, "
-            "중립은 0 근처입니다. 높을수록 그 자산에 상대적으로 더 무게를 둔다는 뜻이며, "
-            "절대 수익률이나 매수·매도 신호가 아닙니다."
-        ),
     }
 
 
 def future_briefing(report: dict[str, Any], seasonal: dict[str, Any] | None = None) -> dict[str, Any]:
     """Future 탭: 상대 점수 기반 비중 방향을 짧게 제시합니다."""
     fc = report.get("forecast") or {}
-    asset = report.get("asset_scores") or {}
     seasonal = seasonal or {}
     parts = [
         f"{fc.get('horizon') or '향후 약 21거래일'}의 상대 방향입니다. "
@@ -238,7 +210,7 @@ def future_briefing(report: dict[str, Any], seasonal: dict[str, Any] | None = No
     parts.append(f"핵심 축은 **{pick}** 입니다.")
     parts.append(
         f"주식을 담는다면 **{fc.get('stage2_market') or '—'}**, "
-        f"업종은 **{fc.get('stage3_sector') or '—'}** 쪽 점수가 높습니다."
+        f"업종은 **{fc.get('stage3_sector') or '—'}** 쪽입니다."
     )
     if fc.get("stage4_stock"):
         parts.append(
@@ -246,9 +218,6 @@ def future_briefing(report: dict[str, Any], seasonal: dict[str, Any] | None = No
             + (f" ({fc.get('stage4_ticker')})" if fc.get("stage4_ticker") else "")
             + " 입니다. 업종 ETF·바스켓이 더 안전합니다."
         )
-    names = {"gold": "금", "bitcoin": "비트코인", "kospi": "코스피", "kosdaq": "코스닥", "nasdaq": "나스닥"}
-    ranked = sorted(asset.items(), key=lambda kv: kv[1], reverse=True)
-    scores = [{"name": names[k], "band": _band(float(v))} for k, v in ranked if k in names]
     if seasonal.get("note"):
         parts.append(seasonal["note"])
     if fc.get("reasons"):
@@ -256,11 +225,6 @@ def future_briefing(report: dict[str, Any], seasonal: dict[str, Any] | None = No
     return {
         "title": _asof_dot(report.get("asof")),
         "paragraphs": parts,
-        "scores": scores,
-        "footnote": (
-            "상대 무게는 자산끼리 견준 점수입니다. 대략 -0.25(낮음)에서 +0.25(높음) 사이이고, "
-            "중립은 0 근처입니다."
-        ),
     }
 
 
