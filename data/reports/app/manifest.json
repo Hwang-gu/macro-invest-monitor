@@ -1,0 +1,9 @@
+{
+  "name": "매크로 배분 모니터",
+  "short_name": "매크로배분",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f1720",
+  "theme_color": "#0f1720",
+  "lang": "ko"
+}

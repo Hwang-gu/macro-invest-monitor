@@ -1,0 +1,283 @@
+{
+  "updated": "2026-08-24",
+  "note": "아래 events 배열에 이슈를 추가·수정·삭제하면 됩니다. 저장 후 python -m src --mode daily --skip-collect 를 실행하면 Issue 시트·그래프 음영·점수에 반영됩니다. JSON은 주석을 넣을 수 없고, 마지막 이슈 뒤에는 쉼표를 두면 안 됩니다.",
+  "edit_guide": {
+    "required_fields": ["id", "date", "end_date", "category", "severity", "name_ko", "summary_ko"],
+    "category": ["war", "disease", "technology", "financial_crisis", "geopolitics", "policy"],
+    "severity": ["high", "medium", "low"],
+    "bias_values": ["positive", "negative", "mixed", "neutral"],
+    "bias_keys": ["gold", "bitcoin", "kospi", "kosdaq", "nasdaq", "stocks", "usdkkrw", "kr_semi", "kr_bio", "kr_finance", "kr_ship", "kr_robot"],
+    "example": {
+      "id": "example-issue",
+      "date": "2026-08-01",
+      "end_date": "2026-12-31",
+      "category": "geopolitics",
+      "severity": "medium",
+      "name_ko": "예시 이슈 (복사해서 쓰세요)",
+      "summary_ko": "한 줄로 시장에 왜 중요한지 적습니다.",
+      "bias": {"gold": "positive", "kospi": "negative"}
+    }
+  },
+  "events": [
+    {
+      "id": "dotcom-crash",
+      "date": "2000-03-10",
+      "end_date": "2002-10-09",
+      "category": "technology",
+      "severity": "high",
+      "name_ko": "닷컴 버블 붕괴",
+      "summary_ko": "나스닥 기술주 폭락. 성장주·신기술 과열 이후 장기 약세.",
+      "bias": { "nasdaq": "negative", "gold": "positive", "kosdaq": "negative" }
+    },
+    {
+      "id": "911",
+      "date": "2001-09-11",
+      "end_date": "2001-10-31",
+      "category": "war",
+      "severity": "high",
+      "name_ko": "9·11 테러",
+      "summary_ko": "안전자산 선호, 항공·보험 충격 후 금리 인하와 반등.",
+      "bias": { "gold": "positive", "stocks": "negative", "bitcoin": "neutral" }
+    },
+    {
+      "id": "iraq-war",
+      "date": "2003-03-20",
+      "end_date": "2003-05-01",
+      "category": "war",
+      "severity": "medium",
+      "name_ko": "이라크 전쟁",
+      "summary_ko": "개전 불확실성 해소 후 위험자산 반등 패턴이 자주 인용됨.",
+      "bias": { "gold": "positive", "stocks": "mixed" }
+    },
+    {
+      "id": "sars",
+      "date": "2003-03-01",
+      "end_date": "2003-07-31",
+      "category": "disease",
+      "severity": "medium",
+      "name_ko": "SARS",
+      "summary_ko": "아시아 수요 충격. 단기 위험회피 후 회복.",
+      "bias": { "kospi": "negative", "gold": "positive" }
+    },
+    {
+      "id": "gfc",
+      "date": "2008-09-15",
+      "end_date": "2009-03-09",
+      "category": "financial_crisis",
+      "severity": "high",
+      "name_ko": "글로벌 금융위기 (리먼)",
+      "summary_ko": "금융·경기 동반 붕괴. 금은 달러 유동성 경색 국면에서 일시 약세 후 강세.",
+      "bias": { "us_finance": "negative", "gold": "mixed", "stocks": "negative", "bitcoin": "neutral" }
+    },
+    {
+      "id": "euro-debt",
+      "date": "2010-04-23",
+      "end_date": "2012-07-26",
+      "category": "financial_crisis",
+      "severity": "high",
+      "name_ko": "유럽 재정위기",
+      "summary_ko": "안전자산·달러 강세, 위험자산 변동성 확대.",
+      "bias": { "gold": "positive", "stocks": "negative" }
+    },
+    {
+      "id": "fukushima",
+      "date": "2011-03-11",
+      "end_date": "2011-06-30",
+      "category": "geopolitics",
+      "severity": "medium",
+      "name_ko": "동일본 대지진·후쿠시마",
+      "summary_ko": "원전·공급망 충격. 한국 일부 산업은 반사이익 논의.",
+      "bias": { "kospi": "mixed", "gold": "positive" }
+    },
+    {
+      "id": "taper-tantrum",
+      "date": "2013-05-22",
+      "end_date": "2013-09-30",
+      "category": "policy",
+      "severity": "medium",
+      "name_ko": "테이퍼 탠트럼",
+      "summary_ko": "미국 장기금리 급등, 신흥국 환율 충격. 금 약세.",
+      "bias": { "gold": "negative", "usdkkrw": "up", "kospi": "negative" }
+    },
+    {
+      "id": "mers-korea",
+      "date": "2015-05-20",
+      "end_date": "2015-07-31",
+      "category": "disease",
+      "severity": "medium",
+      "name_ko": "한국 MERS",
+      "summary_ko": "내수·바이오 테마. 코스피 단기 충격 후 바이오 관심.",
+      "bias": { "kr_bio": "mixed", "kospi": "negative" }
+    },
+    {
+      "id": "alphago",
+      "date": "2016-03-09",
+      "end_date": "2016-03-15",
+      "category": "technology",
+      "severity": "medium",
+      "name_ko": "알파고 vs 이세돌",
+      "summary_ko": "AI 대중화 전환점. 이후 반도체·소프트웨어 장기 서사 강화.",
+      "bias": { "nasdaq": "positive", "us_semi": "positive", "us_robotics": "positive" }
+    },
+    {
+      "id": "brexit",
+      "date": "2016-06-24",
+      "end_date": "2016-07-15",
+      "category": "geopolitics",
+      "severity": "medium",
+      "name_ko": "브렉시트",
+      "summary_ko": "위험회피 급등 후 빠른 반등.",
+      "bias": { "gold": "positive", "stocks": "negative" }
+    },
+    {
+      "id": "btc-2017",
+      "date": "2017-12-17",
+      "end_date": "2018-12-15",
+      "category": "technology",
+      "severity": "medium",
+      "name_ko": "비트코인 1차 버블과 크립토 윈터",
+      "summary_ko": "고점 이후 약 1년 급락. 유동성·규제 민감.",
+      "bias": { "bitcoin": "negative" }
+    },
+    {
+      "id": "thaad-china",
+      "date": "2017-03-01",
+      "end_date": "2017-12-31",
+      "category": "geopolitics",
+      "severity": "medium",
+      "name_ko": "사드 보복 (한중)",
+      "summary_ko": "중국 노출 내수·관광 충격. 반도체는 상대적으로 분리.",
+      "bias": { "kospi": "negative", "kr_semi": "mixed" }
+    },
+    {
+      "id": "trade-war",
+      "date": "2018-03-22",
+      "end_date": "2019-12-31",
+      "category": "geopolitics",
+      "severity": "high",
+      "name_ko": "미중 무역분쟁",
+      "summary_ko": "글로벌 공급망·반도체 사이클 교란. 환율·안전자산 동반 변동.",
+      "bias": { "kr_semi": "negative", "kospi": "negative", "gold": "positive" }
+    },
+    {
+      "id": "japan-export-curbs",
+      "date": "2019-07-01",
+      "end_date": "2019-12-31",
+      "category": "geopolitics",
+      "severity": "medium",
+      "name_ko": "일본 수출규제 (반도체 소재)",
+      "summary_ko": "한국 반도체 소재·부품 자립 테마와 단기 공급 불안.",
+      "bias": { "kr_semi": "mixed", "kospi": "negative" }
+    },
+    {
+      "id": "covid-qe",
+      "date": "2020-03-15",
+      "end_date": "2021-11-03",
+      "category": "policy",
+      "severity": "high",
+      "name_ko": "코로나 유동성 확대 (연준 무제한 QE)",
+      "summary_ko": "제로금리·자산매입. 나스닥·비트코인·성장주 유동성 장세, 이후 인플레 씨앗.",
+      "bias": { "nasdaq": "positive", "bitcoin": "positive", "gold": "positive", "kosdaq": "positive" }
+    },
+    {
+      "id": "covid",
+      "date": "2020-03-11",
+      "end_date": "2022-05-05",
+      "category": "disease",
+      "severity": "high",
+      "name_ko": "코로나19 팬데믹",
+      "summary_ko": "급락 후 유동성 장세. 나스닥·바이오·비트코인 강세, 이후 인플레.",
+      "bias": { "gold": "positive", "nasdaq": "positive", "bitcoin": "positive", "kr_bio": "positive", "us_finance": "negative" }
+    },
+    {
+      "id": "ukraine",
+      "date": "2022-02-24",
+      "end_date": "2023-12-31",
+      "category": "war",
+      "severity": "high",
+      "name_ko": "러시아-우크라이나 전쟁",
+      "summary_ko": "에너지·곡물 충격, 인플레 가속, 금·원자재 관심. 조선·방산 테마.",
+      "bias": { "gold": "positive", "kr_ship": "positive", "stocks": "negative" }
+    },
+    {
+      "id": "hike-cycle-2022",
+      "date": "2022-03-16",
+      "end_date": "2023-07-26",
+      "category": "policy",
+      "severity": "high",
+      "name_ko": "미 연준 급격 금리인상",
+      "summary_ko": "실질금리 상승 → 금·성장주·비트코인 역풍, 달러 강세, 원/달러 급등.",
+      "bias": { "gold": "negative", "nasdaq": "negative", "bitcoin": "negative", "usdkkrw": "up" }
+    },
+    {
+      "id": "ftx",
+      "date": "2022-11-11",
+      "end_date": "2023-01-31",
+      "category": "financial_crisis",
+      "severity": "medium",
+      "name_ko": "FTX 파산",
+      "summary_ko": "크립토 신용 충격. 비트코인은 이후 반등.",
+      "bias": { "bitcoin": "negative" }
+    },
+    {
+      "id": "chatgpt",
+      "date": "2022-11-30",
+      "end_date": "2026-12-31",
+      "category": "technology",
+      "severity": "high",
+      "name_ko": "생성형 AI (ChatGPT) 보급",
+      "summary_ko": "나스닥·반도체·전력·로봇 장기 서사. 한국 반도체 슈퍼사이클과 중첩.",
+      "bias": { "nasdaq": "positive", "us_semi": "positive", "kr_semi": "positive", "us_robotics": "positive" }
+    },
+    {
+      "id": "svb",
+      "date": "2023-03-10",
+      "end_date": "2023-05-01",
+      "category": "financial_crisis",
+      "severity": "medium",
+      "name_ko": "SVB 파산",
+      "summary_ko": "금융 스트레스, 금리 인하 기대, 성장주·금 단기 강세.",
+      "bias": { "us_finance": "negative", "nasdaq": "positive", "gold": "positive" }
+    },
+    {
+      "id": "israel-hamas",
+      "date": "2023-10-07",
+      "end_date": "2026-12-31",
+      "category": "war",
+      "severity": "high",
+      "name_ko": "이스라엘-하마스 전쟁",
+      "summary_ko": "중동 리스크 프리미엄. 유가·금 민감, 확전 시 위험자산 약세.",
+      "bias": { "gold": "positive", "stocks": "mixed" }
+    },
+    {
+      "id": "btc-etf",
+      "date": "2024-01-10",
+      "end_date": "2024-12-31",
+      "category": "technology",
+      "severity": "medium",
+      "name_ko": "미국 비트코인 현물 ETF 승인",
+      "summary_ko": "기관 자금 유입 경로 공식화. 유동성·실질금리에 여전히 민감.",
+      "bias": { "bitcoin": "positive" }
+    },
+    {
+      "id": "fed-cut-2024",
+      "date": "2024-09-18",
+      "end_date": "2026-12-31",
+      "category": "policy",
+      "severity": "medium",
+      "name_ko": "연준 금리인하 사이클 개시",
+      "summary_ko": "단기금리 하락 → 원화·금·성장주 우호 가능. 수출주는 원화 강세 시 실적 역풍.",
+      "bias": { "nasdaq": "positive", "gold": "positive", "bitcoin": "positive", "kospi": "mixed" }
+    },
+    {
+      "id": "korea-martial-law-2024",
+      "date": "2024-12-03",
+      "end_date": "2024-12-31",
+      "category": "geopolitics",
+      "severity": "high",
+      "name_ko": "한국 비상계엄 사태",
+      "summary_ko": "정치 리스크로 코스피·원화 변동성 급등. 국내 주식 디스카운트 재부각.",
+      "bias": { "kospi": "negative", "kosdaq": "negative", "usdkkrw": "up", "gold": "positive" }
+    }
+  ]
+}

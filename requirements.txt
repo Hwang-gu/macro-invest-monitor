@@ -1,0 +1,14 @@
+pandas>=2.2
+numpy>=2.0
+yfinance>=0.2.50
+requests>=2.32
+python-dotenv>=1.0
+scikit-learn>=1.6
+joblib>=1.4
+pyarrow>=17
+plotly>=5.24
+streamlit>=1.40
+google-genai>=1.0
+finance-datareader>=0.9.50
+lxml>=5.3
+openpyxl>=3.1
