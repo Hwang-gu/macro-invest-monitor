@@ -68,7 +68,20 @@
     .menus button.on { background: #1e4d8c; border-color: #6ea2e6; }
     .panel { line-height: 1.55; font-size: .95rem; }
     .panel p { margin: 0 0 12px; }
-    .chart { height: 280px; margin: 0 0 16px; }
+    .chart-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      margin: 0 0 16px;
+      padding-bottom: 4px;
+    }
+    .chart {
+      height: 300px; min-width: 920px; width: 220%;
+      touch-action: none;
+    }
+    .chart.issues { height: 210px; }
+    .chart.compare { height: 340px; }
+    .js-plotly-plot, .js-plotly-plot .plotly, .js-plotly-plot .main-svg { touch-action: none; }
     .legend { font-size: .78rem; color: #c5d0de; margin: -6px 0 16px; }
     .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px 0 8px; }
     .modal-bg {
@@ -125,19 +138,23 @@
         <button type="button" data-tab="future">Future</button>
       </nav>
       <div id="past" class="panel hidden">
-        <p>2000년 이후 월말 기준입니다. 지수는 각자 첫 관측=100. 코스피·코스닥은 함께, 나스닥·금·비트코인은 각각 따로 그려 등락이 눌리지 않게 했습니다. 색 띠는 이슈 구간입니다.</p>
+        <p>월말 기준입니다. 한 손가락으로 좌우 이동, 두 손가락으로 확대·축소할 수 있습니다. 아래 막대를 좌우로 밀어도 됩니다.</p>
+        <p class="hint">추세 비교는 가격이 아니라, 각자 역사에서 상대적으로 높고 낮음(최저 0 · 최고 100)입니다. 금이 오를 때 코스피가 내리는지 같은 방향을 보려면 이 그래프와 범례 켜기/끄기를 쓰세요.</p>
         <div class="legend">
-          <span class="dot" style="background:#c45c5c"></span>전쟁
-          <span class="dot" style="background:#8b6bb3"></span>질병
-          <span class="dot" style="background:#3d9a6a"></span>신기술
-          <span class="dot" style="background:#888"></span>위기
-          <span class="dot" style="background:#3a7fc1"></span>정책
+          <span class="dot" style="background:#e07070"></span>전쟁
+          <span class="dot" style="background:#c090e0"></span>질병
+          <span class="dot" style="background:#3dcc7a"></span>신기술
+          <span class="dot" style="background:#c8c8c8"></span>위기
+          <span class="dot" style="background:#e0a050"></span>지정학
+          <span class="dot" style="background:#5aa0ff"></span>정책
         </div>
-        <div class="chart" id="chartRates"></div>
-        <div class="chart" id="chartKorea"></div>
-        <div class="chart" id="chartNasdaq"></div>
-        <div class="chart" id="chartGold"></div>
-        <div class="chart" id="chartBtc"></div>
+        <div class="chart-scroll"><div class="chart issues" id="chartIssues"></div></div>
+        <div class="chart-scroll"><div class="chart compare" id="chartCompare"></div></div>
+        <div class="chart-scroll"><div class="chart" id="chartRates"></div></div>
+        <div class="chart-scroll"><div class="chart" id="chartKorea"></div></div>
+        <div class="chart-scroll"><div class="chart" id="chartNasdaq"></div></div>
+        <div class="chart-scroll"><div class="chart" id="chartGold"></div></div>
+        <div class="chart-scroll"><div class="chart" id="chartBtc"></div></div>
       </div>
       <div id="present" class="panel hidden"></div>
       <div id="future" class="panel hidden"></div>
@@ -234,55 +251,169 @@
       return `<div class="weights">${rows}</div>`;
     }
 
+    const ISSUE = {
+      war: {fill: "rgba(224,112,112,.28)", line: "#e07070", bar: "#e07070"},
+      disease: {fill: "rgba(192,144,224,.28)", line: "#c090e0", bar: "#c090e0"},
+      technology: {fill: "rgba(61,204,122,.26)", line: "#3dcc7a", bar: "#3dcc7a"},
+      financial_crisis: {fill: "rgba(200,200,200,.26)", line: "#d0d0d0", bar: "#c8c8c8"},
+      policy: {fill: "rgba(90,160,255,.28)", line: "#5aa0ff", bar: "#5aa0ff"},
+      geopolitics: {fill: "rgba(224,160,80,.28)", line: "#e0a050", bar: "#e0a050"}
+    };
+    const LANES = ["war", "disease", "technology", "financial_crisis", "geopolitics", "policy"];
+    const LANE_KO = {war:"전쟁", disease:"질병", technology:"신기술", financial_crisis:"위기", geopolitics:"지정학", policy:"정책"};
+    const COMPARE = [
+      {key: "kospi", name: "코스피", color: "#7eb6ff"},
+      {key: "kosdaq", name: "코스닥", color: "#f0c36a"},
+      {key: "nasdaq", name: "나스닥", color: "#8fd19e"},
+      {key: "gold", name: "금", color: "#e2c36b"},
+      {key: "bitcoin", name: "비트코인", color: "#c9a27a"},
+      {key: "us_ffr", name: "미국 기준금리", color: "#9ad0ff"},
+      {key: "kr_call", name: "한국 기준금리", color: "#ffd27a"}
+    ];
+    const PLOT_CFG = {
+      responsive: true,
+      displaylogo: false,
+      scrollZoom: true,
+      displayModeBar: true,
+      doubleClick: "reset",
+      modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"]
+    };
+
+    function scale01(arr) {
+      const vals = arr.filter(v => v != null && v === v);
+      if (!vals.length) return arr.slice();
+      const lo = Math.min.apply(null, vals);
+      const hi = Math.max.apply(null, vals);
+      const span = hi - lo || 1;
+      return arr.map(v => (v == null || v !== v) ? null : Math.round((v - lo) / span * 1000) / 10);
+    }
+
     function issueShapes() {
-      const color = {war:"rgba(180,70,70,.28)", disease:"rgba(120,80,160,.28)", technology:"rgba(40,130,90,.25)",
-        financial_crisis:"rgba(90,90,90,.28)", policy:"rgba(50,110,170,.25)", geopolitics:"rgba(170,110,40,.25)"};
+      return (BOOT.events || []).map(ev => {
+        const pal = ISSUE[ev.category] || ISSUE.financial_crisis;
+        return {
+          type: "rect", xref: "x", yref: "paper",
+          x0: ev.start, x1: ev.end, y0: 0, y1: 1,
+          fillcolor: pal.fill, line: {width: 1, color: pal.line}, layer: "below"
+        };
+      });
+    }
+
+    function issueHover(yTop) {
+      if (yTop == null) return [];
       return (BOOT.events || []).map(ev => ({
-        type: "rect", xref: "x", yref: "paper",
-        x0: ev.start, x1: ev.end, y0: 0, y1: 1,
-        fillcolor: color[ev.category] || "rgba(120,120,120,.2)",
-        line: {width: 0}, layer: "below"
+        x: [ev.start],
+        y: [yTop],
+        type: "scatter",
+        mode: "markers",
+        marker: {size: 9, color: (ISSUE[ev.category] || ISSUE.financial_crisis).bar},
+        name: ev.name,
+        text: [ev.name + "<br>" + (ev.category_ko || "") + "<br>" + ev.start + " ~ " + ev.end],
+        hovertemplate: "%{text}<extra></extra>",
+        showlegend: false
       }));
     }
 
-    function chartLayout(title, yaxis) {
-      return {
+    function chartLayout(title, yaxis, extra) {
+      const xaxis = {
+        gridcolor: "#1c2a44", color: "#fff",
+        rangeslider: {visible: true, bgcolor: "#10192b", thickness: 0.14},
+        rangeselector: {
+          bgcolor: "#10192b",
+          activecolor: "#1e4d8c",
+          font: {color: "#fff", size: 10},
+          x: 0, y: 1.16,
+          buttons: [
+            {count: 1, label: "1Y", step: "year", stepmode: "backward"},
+            {count: 5, label: "5Y", step: "year", stepmode: "backward"},
+            {count: 10, label: "10Y", step: "year", stepmode: "backward"},
+            {step: "all", label: "전체"}
+          ]
+        }
+      };
+      return Object.assign({
         title,
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
         font: {color: "#fff", family: "Chosunilbo Myeongjo, serif", size: 11},
-        margin: {l: 42, r: 18, t: 36, b: 48},
-        legend: {orientation: "h", y: -0.28, font: {size: 10}},
-        xaxis: {gridcolor: "#1c2a44", color: "#fff"},
-        yaxis: Object.assign({gridcolor: "#1c2a44", color: "#fff"}, yaxis || {}),
+        margin: {l: 46, r: 16, t: 64, b: 16},
+        legend: {orientation: "h", y: -0.42, font: {size: 10}},
+        hovermode: "x unified",
+        dragmode: "pan",
+        xaxis,
+        yaxis: Object.assign({gridcolor: "#1c2a44", color: "#fff", fixedrange: false}, yaxis || {}),
         shapes: issueShapes(),
         autosize: true
-      };
+      }, extra || {});
+    }
+
+    function drawIssues() {
+      const traces = (BOOT.events || []).map(ev => {
+        const lane = Math.max(0, LANES.indexOf(ev.category));
+        const pal = ISSUE[ev.category] || ISSUE.financial_crisis;
+        return {
+          type: "scatter",
+          mode: "lines",
+          x: [ev.start, ev.end],
+          y: [lane, lane],
+          line: {width: 18, color: pal.bar},
+          name: ev.name,
+          hovertemplate: "<b>" + ev.name + "</b><br>" + (ev.category_ko || LANE_KO[ev.category] || "") + "<br>" + ev.start + " ~ " + ev.end + "<extra></extra>",
+          showlegend: false
+        };
+      });
+      Plotly.newPlot("chartIssues", traces, {
+        title: "이슈 타임라인 (막대를 누르면 이름)",
+        paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
+        font: {color: "#fff", family: "Chosunilbo Myeongjo, serif", size: 11},
+        margin: {l: 58, r: 16, t: 40, b: 40},
+        dragmode: "pan",
+        hovermode: "closest",
+        xaxis: {gridcolor: "#1c2a44", color: "#fff"},
+        yaxis: {
+          gridcolor: "#1c2a44", color: "#fff",
+          tickmode: "array",
+          tickvals: LANES.map((_, i) => i),
+          ticktext: LANES.map(k => LANE_KO[k]),
+          range: [LANES.length - 0.6, -0.6]
+        },
+        autosize: true
+      }, PLOT_CFG);
     }
 
     function drawPast() {
       const c = BOOT.chart || {};
-      const opts = {displayModeBar: false, responsive: true};
+      drawIssues();
+      const compare = COMPARE.map(s => ({
+        x: c.dates,
+        y: scale01(c[s.key] || []),
+        name: s.name,
+        type: "scatter",
+        mode: "lines",
+        line: {color: s.color, width: 1.8}
+      })).concat(issueHover(100));
+      Plotly.newPlot("chartCompare", compare, chartLayout("추세 비교 (각자 최저=0, 최고=100)", {title: "상대", range: [-2, 108]}), PLOT_CFG);
+
       Plotly.newPlot("chartRates", [
         {x: c.dates, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
         {x: c.dates, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
-      ], chartLayout("기준금리 (%)", {title: "%"}), opts);
+      ].concat(issueHover(6)), chartLayout("기준금리 (%)", {title: "%"}), PLOT_CFG);
 
       Plotly.newPlot("chartKorea", [
         {x: c.dates, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
         {x: c.dates, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
-      ], chartLayout("코스피·코스닥 (첫 관측=100)"), opts);
+      ], chartLayout("코스피·코스닥 (첫 관측=100)"), PLOT_CFG);
 
       Plotly.newPlot("chartNasdaq", [
         {x: c.dates, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: "#8fd19e"}}
-      ], chartLayout("나스닥 (첫 관측=100)"), opts);
+      ], chartLayout("나스닥 (첫 관측=100)"), PLOT_CFG);
 
       Plotly.newPlot("chartGold", [
         {x: c.dates, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: "#e2c36b"}}
-      ], chartLayout("금 (첫 관측=100)"), opts);
+      ], chartLayout("금 (첫 관측=100)"), PLOT_CFG);
 
       Plotly.newPlot("chartBtc", [
         {x: c.dates, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: "#c9a27a"}}
-      ], chartLayout("비트코인 (첫 관측=100)"), opts);
+      ], chartLayout("비트코인 (첫 관측=100)"), PLOT_CFG);
     }
 
     function showHome() {
@@ -293,7 +424,7 @@
     function openTab(name) {
       ["past","present","future"].forEach(t => $(t).classList.toggle("hidden", t !== name));
       document.querySelectorAll(".menus button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
-      if (name === "past") setTimeout(drawPast, 30);
+      if (name === "past") setTimeout(drawPast, 80);
     }
 
     function enter(role) {
