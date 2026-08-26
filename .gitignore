@@ -21,3 +21,4 @@ data/reports/app/sync.js
 *.joblib
 
 app/.streamlit/secrets.toml
+.ted_sync_secret

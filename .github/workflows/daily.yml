@@ -32,6 +32,7 @@ jobs:
           TED_MANAGER_PW: ${{ secrets.TED_MANAGER_PW }}
           TED_USER_ID: ${{ secrets.TED_USER_ID }}
           TED_USER_PW: ${{ secrets.TED_USER_PW }}
+          TED_SYNC_TOKEN: ${{ secrets.TED_SYNC_TOKEN }}
         run: python -m src --mode daily
       - name: Save data for next run
         run: |

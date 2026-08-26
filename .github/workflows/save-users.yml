@@ -1,0 +1,27 @@
+name: save-ted-users
+
+on:
+  repository_dispatch:
+    types: [ted-users]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: save-ted-users
+  cancel-in-progress: false
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write user list
+        run: python -c "import json, os, pathlib; ev=json.loads(pathlib.Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8')); pathlib.Path('data/ted_users.json').write_text(ev['client_payload']['users'], encoding='utf-8')"
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ted_users.json
+          git diff --cached --quiet || git commit -m "update ted users"
+          git push

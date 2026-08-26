@@ -562,38 +562,56 @@
     async function githubSaveUsers(list) {
       const token = currentWriteToken();
       if (!token) return false;
-      const headers = {
-        Authorization: "Bearer " + token,
+      const body = JSON.stringify(list, null, 2);
+      const headersFor = (scheme) => ({
+        Authorization: scheme + " " + token,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28"
-      };
-      const putOnce = async (sha) => {
+      });
+      const putOnce = async (headers, sha) => {
         const payload = {
           message: "update ted users",
-          content: utf8ToB64(JSON.stringify(list, null, 2)),
+          content: utf8ToB64(body),
           branch: "main"
         };
         if (sha) payload.sha = sha;
-        const r = await fetch(USERS_API, {
+        return fetch(USERS_API, {
           method: "PUT",
           headers: Object.assign({ "Content-Type": "application/json" }, headers),
           body: JSON.stringify(payload)
         });
-        return r;
       };
-      let sha;
-      try {
-        const cur = await fetch(USERS_API, { headers });
-        if (cur.ok) sha = (await cur.json()).sha;
-      } catch {}
-      try {
-        let r = await putOnce(sha);
+      const tryPut = async (scheme) => {
+        const headers = headersFor(scheme);
+        let sha;
+        try {
+          const cur = await fetch(USERS_API, { headers });
+          if (cur.ok) sha = (await cur.json()).sha;
+        } catch {}
+        let r = await putOnce(headers, sha);
         if (r.status === 409) {
           const cur = await fetch(USERS_API, { headers });
           if (cur.ok) sha = (await cur.json()).sha;
-          r = await putOnce(sha);
+          r = await putOnce(headers, sha);
         }
         return r.ok;
+      };
+      try {
+        if (await tryPut("Bearer")) return true;
+        if (await tryPut("token")) return true;
+      } catch {}
+      try {
+        const r = await fetch("https://api.github.com/repos/Hwang-gu/macro-invest-monitor/dispatches", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token,
+            Accept: "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28"
+          },
+          body: JSON.stringify({ event_type: "ted-users", client_payload: { users: body } })
+        });
+        return r.status === 204 || r.ok;
       } catch {
         return false;
       }
@@ -992,17 +1010,28 @@
       if (acc.role === "Manager") {
         try { rememberWriteToken(await unlockSyncToken(pw)); }
         catch { loadWriteToken(); }
-        if (currentWriteToken() && mutableUsers().length) {
-          try { await saveUserStore(mutableUsers()); }
-          catch {}
+        enter(acc.role, acc.id);
+        if (!currentWriteToken()) {
+          $("userModal").classList.remove("hidden");
+          $("userErr").textContent = "다른 기기와 맞추는 키가 열리지 않았습니다. 매니저 비밀번호를 다시 입력해 로그인해 주세요.";
+          return;
         }
-      } else {
-        const rec = userStore().find(a => String(a.id).toLowerCase() === String(acc.id).toLowerCase());
-        try {
-          if (rec && rec.wrap) rememberWriteToken(await unlockBox(pw, rec.wrap));
-          else clearWriteToken();
-        } catch { clearWriteToken(); }
+        if (mutableUsers().length) {
+          let synced = false;
+          try { synced = await saveUserStore(mutableUsers()); }
+          catch {}
+          if (!synced) {
+            $("userModal").classList.remove("hidden");
+            $("userErr").textContent = "폰의 계정 목록을 아직 GitHub에 올리지 못했습니다. 잠시 후 다시 매니저로 로그인해 주세요.";
+          }
+        }
+        return;
       }
+      const rec = userStore().find(a => String(a.id).toLowerCase() === String(acc.id).toLowerCase());
+      try {
+        if (rec && rec.wrap) rememberWriteToken(await unlockBox(pw, rec.wrap));
+        else clearWriteToken();
+      } catch { clearWriteToken(); }
       enter(acc.role, acc.id);
     };
     $("addUserBtn").onclick = async () => {
