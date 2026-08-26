@@ -9,6 +9,7 @@ from .config import (
     ASSET_KEYS,
     EVENTS_PATH,
     PROCESSED_DIR,
+    START,
     Series,
     UNIVERSE,
     series_by_key,
@@ -72,7 +73,11 @@ def to_panel(raw: dict[str, pd.Series]) -> pd.DataFrame:
     if not frames:
         raise ValueError("원본 데이터가 없습니다.")
     panel = pd.concat(frames, axis=1).sort_index()
-    biz = pd.bdate_range(panel.index.min(), panel.index.max())
+    panel = panel[panel.index >= pd.Timestamp(START)]
+    if panel.empty:
+        raise ValueError("2000-01-01 이후 원본 데이터가 없습니다.")
+    start = max(pd.Timestamp(START), panel.index.min())
+    biz = pd.bdate_range(start, panel.index.max())
     panel = panel.reindex(biz)
     meta = series_by_key()
     for col in panel.columns:

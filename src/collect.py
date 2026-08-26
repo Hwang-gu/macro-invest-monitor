@@ -35,11 +35,13 @@ def _read_existing(key: str) -> pd.Series | None:
         return None
     s = df["value"].astype(float)
     s.name = key
+    s = s[s.index >= pd.Timestamp(START)]
     return s.sort_index()
 
 
 def _save(key: str, series: pd.Series) -> pd.Series:
     series = series.dropna().sort_index()
+    series = series[series.index >= pd.Timestamp(START)]
     series = series[~series.index.duplicated(keep="last")]
     series.name = "value"
     out = series.to_frame()

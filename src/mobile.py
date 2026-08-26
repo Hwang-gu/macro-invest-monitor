@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .config import APP_DIR, ROOT, ted_accounts
+from .config import APP_DIR, ROOT, START, ted_accounts
 from .narrative import future_briefing, present_briefing
 from .process import load_events
 
@@ -60,6 +60,7 @@ def _monthly_values(series: pd.Series, ndigits: int) -> list[float | None]:
 def _chart_bundle(panel: pd.DataFrame) -> dict[str, Any]:
     cols = [c for c in ["us_ffr", "kr_call", "kospi", "kosdaq", "nasdaq", "gold", "bitcoin"] if c in panel.columns]
     monthly = panel[cols].resample("ME").last()
+    monthly = monthly[monthly.index >= pd.Timestamp(START)]
     dates = [d.strftime("%Y-%m") for d in monthly.index]
     bundle: dict[str, Any] = {"dates": dates}
     digits = {"us_ffr": 3, "kr_call": 3, "kospi": 2, "kosdaq": 2, "nasdaq": 2, "gold": 2, "bitcoin": 1}
@@ -74,10 +75,15 @@ def _chart_bundle(panel: pd.DataFrame) -> dict[str, Any]:
 def _events_payload() -> list[dict[str, str]]:
     events = load_events()
     rows = []
+    start = pd.Timestamp(START)
     for _, ev in events.iterrows():
+        ev_end = pd.Timestamp(ev["end_date"])
+        ev_start = pd.Timestamp(ev["date"])
+        if ev_end < start:
+            continue
         rows.append({
-            "start": pd.Timestamp(ev["date"]).strftime("%Y-%m-%d"),
-            "end": pd.Timestamp(ev["end_date"]).strftime("%Y-%m-%d"),
+            "start": max(ev_start, start).strftime("%Y-%m-%d"),
+            "end": ev_end.strftime("%Y-%m-%d"),
             "name": str(ev["name_ko"]),
             "category": str(ev["category"]),
             "category_ko": CAT_KO.get(str(ev["category"]), str(ev["category"])),

@@ -189,21 +189,36 @@
       }
       #login .brand { margin-bottom: 0; }
       #login .brand .logo { width: 128px; height: 128px; }
-      #login .login-form { width: min(400px, 100%); }
+      #login .login-form, #join .login-form { width: min(400px, 100%); }
+      #join:not(.hidden) {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        justify-items: center;
+        width: 100%;
+        gap: 24px 48px;
+      }
+      #join .brand { margin-bottom: 0; }
+      #join .brand .logo { width: 128px; height: 128px; }
       #app:not(.hidden) {
         flex: 1;
         min-height: 0;
         height: auto;
       }
       #app.home .menus {
-        flex-direction: row;
-        align-items: center;
+        flex-direction: column;
+        align-items: stretch;
         justify-content: center;
-        gap: 16px;
+        max-width: 420px;
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+        gap: 12px;
       }
       #app.home .menus button {
-        padding: 22px 12px;
-        font-size: 1.12rem;
+        padding: 18px 12px;
+        font-size: 1.08rem;
         height: auto;
       }
       .menus {
@@ -261,9 +276,27 @@
       </div>
       <div class="err" id="loginErr"></div>
       <div class="ok" id="loginOk"></div>
-      <p class="hint" id="loginHint">매니저 계정은 어느 폰에서나 같은 ID·PW로 들어갑니다. User Add로 만든 계정은 쓰던 폰에서 보낸 링크를 이 폰에서 연 뒤 로그인하세요.</p>
+      <p class="hint" id="loginHint">매니저 계정은 어느 기기에서나 같은 ID·PW로 들어갑니다. 초대로 만든 계정은 매니저 승인 후에 로그인됩니다.</p>
       <button class="primary" id="loginBtn" type="button">Sign in</button>
       <button class="ghost" id="adminBtn" type="button">Information</button>
+      </div>
+    </section>
+
+    <section id="join" class="hidden">
+      <div class="brand">
+        <img class="logo" src="logo.jpg" alt="Ted Investment"/>
+        Ted Investment
+      </div>
+      <div class="login-form">
+        <p class="hint">계정을 만들면 매니저 승인 후 로그인할 수 있습니다.</p>
+        <label for="joinId">ID</label>
+        <input id="joinId" autocomplete="username"/>
+        <label for="joinPw">PW</label>
+        <input id="joinPw" type="password" autocomplete="new-password"/>
+        <div class="err" id="joinErr"></div>
+        <div class="ok" id="joinOk"></div>
+        <button class="primary" id="joinBtn" type="button">가입 신청</button>
+        <button class="ghost" id="joinBackBtn" type="button">로그인으로</button>
       </div>
     </section>
 
@@ -279,7 +312,7 @@
           </div>
         </div>
         <div class="top-actions">
-          <button class="ghost hidden" id="userAddBtn" type="button">User Add</button>
+          <button class="ghost hidden" id="userAddBtn" type="button">User</button>
           <button class="ghost" id="logoutBtn" type="button">Logout</button>
         </div>
       </div>
@@ -328,17 +361,18 @@
 
   <div id="userModal" class="modal-bg hidden">
     <div class="modal form">
-      <h2>User Add</h2>
-      <p class="hint">추가한 계정은 이 폰에 저장됩니다. 다른 폰에서도 쓰려면 아래 「다른 폰으로 보내기」로 링크를 보내세요.</p>
+      <h2>User</h2>
+      <p class="hint">가입 링크를 보내면 상대가 계정을 만들고, 승인 요청을 보냅니다. 아래에서 승인해야 로그인됩니다.</p>
+      <button class="primary" id="inviteBtn" type="button">가입 링크 보내기</button>
+      <div id="pendingList"></div>
       <div id="userList"></div>
-      <label for="newUserId">ID</label>
+      <label for="newUserId">직접 등록 ID</label>
       <input id="newUserId" autocomplete="off"/>
       <label for="newUserPw">PW</label>
       <input id="newUserPw" type="password" autocomplete="new-password"/>
       <div class="err" id="userErr"></div>
       <div class="ok" id="userOk"></div>
-      <button class="primary" id="addUserBtn" type="button">Add</button>
-      <button class="ghost" id="shareUsersBtn" type="button">다른 폰으로 보내기</button>
+      <button class="ghost" id="addUserBtn" type="button">직접 등록</button>
       <button class="ghost" id="closeUser" type="button">닫기</button>
     </div>
   </div>
@@ -348,8 +382,26 @@
     const BOOT = JSON.parse(document.getElementById("boot").textContent);
     const $ = (id) => document.getElementById(id);
     const EXTRA_KEY = "ted_extra_users";
+    const PENDING_KEY = "ted_pending_users";
+    const OWN_PENDING_KEY = "ted_own_pending";
     const AUTO_KEY = "ted_auto_sign";
     let sharedUsers = [];
+
+    function clipChart(c) {
+      const dates = (c.dates || []).slice();
+      let i0 = 0;
+      while (i0 < dates.length && String(dates[i0]) < "2000-01") i0++;
+      const out = { dates: dates.slice(i0) };
+      Object.keys(c || {}).forEach(k => {
+        if (k === "dates") return;
+        out[k] = Array.isArray(c[k]) ? c[k].slice(i0) : c[k];
+      });
+      return out;
+    }
+    const CHART = clipChart(BOOT.chart || { dates: [] });
+    BOOT.events = (BOOT.events || []).filter(ev => String(ev.end || "") >= "2000-01-01").map(ev => Object.assign({}, ev, {
+      start: String(ev.start || "") < "2000-01-01" ? "2000-01-01" : ev.start
+    }));
 
     function extraUsers() {
       try { return JSON.parse(localStorage.getItem(EXTRA_KEY) || "[]"); }
@@ -357,6 +409,21 @@
     }
     function saveExtraUsers(list) {
       localStorage.setItem(EXTRA_KEY, JSON.stringify(list));
+    }
+    function pendingUsers() {
+      try { return JSON.parse(localStorage.getItem(PENDING_KEY) || "[]"); }
+      catch { return []; }
+    }
+    function savePendingUsers(list) {
+      localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+    }
+    function ownPending() {
+      try { return JSON.parse(localStorage.getItem(OWN_PENDING_KEY) || "null"); }
+      catch { return null; }
+    }
+    function saveOwnPending(row) {
+      if (row) localStorage.setItem(OWN_PENDING_KEY, JSON.stringify(row));
+      else localStorage.removeItem(OWN_PENDING_KEY);
     }
     function validUser(a) {
       return a && a.role === "User" && String(a.id || "").trim() && /^[a-f0-9]{64}$/i.test(String(a.hash || ""));
@@ -403,13 +470,15 @@
       const bin = atob(s);
       return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
     }
-    function extraShareUrl(list) {
-      const ted = b64urlEncode(JSON.stringify(list));
+    function appUrl(params) {
       const url = new URL(location.href);
       url.hash = "";
       url.search = "";
-      url.searchParams.set("ted", ted);
+      Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v));
       return url.toString();
+    }
+    function extraShareUrl(list) {
+      return appUrl({ ted: b64urlEncode(JSON.stringify(list)) });
     }
     function mergeExtras(incoming) {
       const list = extraUsers();
@@ -427,58 +496,85 @@
       if (n) saveExtraUsers(list);
       return n;
     }
+    function mergePending(incoming) {
+      const list = pendingUsers();
+      const have = new Set(list.map(a => String(a.id).toLowerCase()).concat(allAuth().map(a => String(a.id).toLowerCase())));
+      let n = 0;
+      incoming.forEach(a => {
+        if (!validUser(a)) return;
+        const id = String(a.id).trim();
+        const key = id.toLowerCase();
+        if (have.has(key)) return;
+        list.push({ role: "User", id, hash: String(a.hash).toLowerCase() });
+        have.add(key);
+        n += 1;
+      });
+      if (n) savePendingUsers(list);
+      return n;
+    }
     function importFromUrl() {
       const url = new URL(location.href);
-      let raw = url.searchParams.get("ted") || "";
-      if (!raw && location.hash.startsWith("#ted=")) raw = location.hash.slice(5);
+      const join = url.searchParams.get("join") === "1";
+      let ted = url.searchParams.get("ted") || "";
+      let req = url.searchParams.get("req") || "";
+      if (!ted && location.hash.startsWith("#ted=")) ted = location.hash.slice(5);
       url.searchParams.delete("ted");
+      url.searchParams.delete("req");
+      if (!join) url.searchParams.delete("join");
       if (url.hash.startsWith("#ted=")) url.hash = "";
       const clean = url.pathname + url.search + url.hash;
-      if (!raw) return 0;
       history.replaceState({}, "", clean || url.pathname);
-      try {
-        const data = JSON.parse(b64urlDecode(raw));
-        return mergeExtras(Array.isArray(data) ? data : [data]);
-      } catch {
-        return 0;
+      const out = { join, ted: 0, req: 0 };
+      if (ted) {
+        try {
+          const data = JSON.parse(b64urlDecode(ted));
+          out.ted = mergeExtras(Array.isArray(data) ? data : [data]);
+          const own = ownPending();
+          if (own && (Array.isArray(data) ? data : [data]).some(a => String(a.id).toLowerCase() === String(own.id).toLowerCase())) {
+            saveOwnPending(null);
+          }
+        } catch {}
       }
-    }
-    async function refreshShared() {
-      try {
-        const r = await fetch("users.json?t=" + Date.now(), { cache: "no-store" });
-        if (!r.ok) return;
-        const data = await r.json();
-        sharedUsers = (Array.isArray(data) ? data : []).filter(validUser);
-      } catch {}
-    }
-    async function shareExtras() {
-      const list = extraUsers();
-      $("userErr").textContent = "";
-      $("userOk").textContent = "";
-      if (!list.length) {
-        $("userErr").textContent = "보낼 추가 계정이 없습니다. 먼저 User를 추가하세요.";
-        return;
+      if (req) {
+        try {
+          const data = JSON.parse(b64urlDecode(req));
+          out.req = mergePending(Array.isArray(data) ? data : [data]);
+        } catch {}
       }
-      const shareUrl = extraShareUrl(list);
+      return out;
+    }
+    async function shareLink(url, text, okEl, okMsg) {
       if (navigator.share) {
         try {
-          await navigator.share({
-            title: "Ted Investment",
-            text: "이 링크를 연 뒤, 등록한 ID와 PW로 로그인하세요.",
-            url: shareUrl
-          });
-          $("userOk").textContent = "다른 폰에서 링크를 열면 계정이 저장됩니다.";
-          return;
+          await navigator.share({ title: "Ted Investment", text, url });
+          if (okEl) okEl.textContent = okMsg;
+          return true;
         } catch (err) {
-          if (err && err.name === "AbortError") return;
+          if (err && err.name === "AbortError") return false;
         }
       }
       try {
-        await navigator.clipboard.writeText(shareUrl);
-        $("userOk").textContent = "링크를 복사했습니다. 다른 폰에서 열면 계정이 저장됩니다.";
+        await navigator.clipboard.writeText(url);
+        if (okEl) okEl.textContent = okMsg;
+        return true;
       } catch {
-        $("userOk").textContent = shareUrl;
+        if (okEl) okEl.textContent = url;
+        return false;
       }
+    }
+    async function refreshShared() {
+      const urls = ["users.json?t=" + Date.now(), "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ted_users.json?t=" + Date.now()];
+      for (const u of urls) {
+        try {
+          const r = await fetch(u, { cache: "no-store" });
+          if (!r.ok) continue;
+          const data = await r.json();
+          sharedUsers = (Array.isArray(data) ? data : []).filter(validUser);
+          if (sharedUsers.length) break;
+        } catch {}
+      }
+      const own = ownPending();
+      if (own && allAuth().some(a => String(a.id).toLowerCase() === String(own.id).toLowerCase())) saveOwnPending(null);
     }
     function autoRecord() {
       try { return JSON.parse(localStorage.getItem(AUTO_KEY) || "null"); }
@@ -491,10 +587,18 @@
       localStorage.removeItem(AUTO_KEY);
     }
     function renderUsers() {
-      const builtin = allAuth().filter(a => a.role === "User");
       const extraIds = new Set(extraUsers().map(a => String(a.id).toLowerCase()));
       const rows = [];
-      builtin.forEach(a => {
+      const pending = pendingUsers();
+      if (pending.length) {
+        rows.push("<p class='hint'>승인 대기</p>");
+        pending.forEach((a, i) => {
+          rows.push(`<div class="user-row"><span>${a.id}</span><button type="button" data-ok="${i}">승인</button></div>`);
+        });
+      }
+      const approved = allAuth().filter(a => a.role === "User");
+      if (approved.length) rows.push("<p class='hint'>승인된 계정</p>");
+      approved.forEach(a => {
         if (!extraIds.has(String(a.id).toLowerCase())) {
           rows.push(`<div class="user-row"><span>${a.id} <small>(모든 기기)</small></span></div>`);
         }
@@ -502,8 +606,21 @@
       extraUsers().forEach((a, i) => {
         rows.push(`<div class="user-row"><span>${a.id}</span><button type="button" data-del="${i}">삭제</button></div>`);
       });
-      $("userList").innerHTML = rows.join("") || "<p class='hint'>아직 추가된 User가 없습니다.</p>";
-      $("userList").querySelectorAll("[data-del]").forEach(btn => {
+      $("userList").innerHTML = "";
+      $("pendingList").innerHTML = rows.join("") || "<p class='hint'>아직 승인 요청이 없습니다. 가입 링크를 보내 주세요.</p>";
+      if (rows.length) $("userList").innerHTML = "";
+      $("pendingList").querySelectorAll("[data-ok]").forEach(btn => {
+        btn.onclick = async () => {
+          const list = pendingUsers();
+          const row = list.splice(Number(btn.dataset.ok), 1)[0];
+          savePendingUsers(list);
+          if (row) mergeExtras([row]);
+          renderUsers();
+          $("userOk").textContent = "승인했습니다. 가입자에게 로그인 링크를 보내 주세요.";
+          if (row) await shareLink(extraShareUrl([row]), "승인되었습니다. 이 링크를 연 뒤 만든 ID·PW로 로그인하세요.", $("userOk"), "승인했습니다. 가입자에게 로그인 링크를 보냈거나 복사했습니다.");
+        };
+      });
+      $("pendingList").querySelectorAll("[data-del]").forEach(btn => {
         btn.onclick = () => {
           const list = extraUsers();
           list.splice(Number(btn.dataset.del), 1);
@@ -515,6 +632,7 @@
 
     function show(id) {
       $("login").classList.toggle("hidden", id !== "login");
+      $("join").classList.toggle("hidden", id !== "join");
       $("app").classList.toggle("hidden", id !== "app");
     }
 
@@ -615,8 +733,10 @@
     }
 
     function chartLayout(yaxis, extra) {
+      const last = CHART.dates.length ? CHART.dates[CHART.dates.length - 1] + "-28" : "2026-12-31";
       const xaxis = {
         gridcolor: "#1c2a44", color: "#fff",
+        range: ["2000-01-01", last],
         rangeslider: {visible: true, bgcolor: "#10192b", thickness: 0.14},
         rangeselector: {
           bgcolor: "#10192b",
@@ -666,7 +786,7 @@
         margin: {l: 58, r: 16, t: 40, b: 40},
         dragmode: "pan",
         hovermode: "closest",
-        xaxis: {gridcolor: "#1c2a44", color: "#fff"},
+        xaxis: {gridcolor: "#1c2a44", color: "#fff", range: ["2000-01-01", (CHART.dates[CHART.dates.length-1] || "2026-12") + "-28"]},
         yaxis: {
           gridcolor: "#1c2a44", color: "#fff",
           tickmode: "array",
@@ -679,7 +799,7 @@
     }
 
     function drawPast() {
-      const c = BOOT.chart || {};
+      const c = CHART;
       drawIssues();
       const compare = COMPARE.map(s => ({
         x: c.dates,
@@ -746,6 +866,8 @@
       });
     }
 
+    let openUsersAfterLogin = false;
+
     function enter(role) {
       $("who").textContent = role;
       $("present").innerHTML = renderPresent(BOOT.present) + weightsHtml(BOOT.weights);
@@ -753,6 +875,11 @@
       $("userAddBtn").classList.toggle("hidden", role !== "Manager");
       show("app");
       showHome();
+      if (openUsersAfterLogin && role === "Manager") {
+        renderUsers();
+        $("userModal").classList.remove("hidden");
+        openUsersAfterLogin = false;
+      }
     }
 
     $("loginBtn").onclick = async () => {
@@ -764,9 +891,17 @@
       catch { $("loginErr").textContent = "로그인 구성을 확인할 수 없습니다. 페이지를 새로고침해 주세요."; return; }
       if (!acc) {
         const known = allAuth().some(a => String(a.id).toLowerCase() === id.toLowerCase());
-        $("loginErr").textContent = known
-          ? "PW가 다릅니다."
-          : "ID / PW 를 확인해 주세요. User Add 계정이면 쓰던 폰에서 받은 링크를 먼저 열어 주세요.";
+        const waiting = ownPending();
+        let waitingMatch = false;
+        if (waiting && String(waiting.id).toLowerCase() === id.toLowerCase()) {
+          try { waitingMatch = await digest("User|" + waiting.id + "|" + pw) === waiting.hash; }
+          catch {}
+        }
+        $("loginErr").textContent = waitingMatch
+          ? "매니저 승인 대기 중입니다. 승인되면 같은 ID·PW로 들어가 주세요."
+          : known
+            ? "PW가 다릅니다."
+            : "ID / PW 를 확인해 주세요. 초대로 가입했다면 매니저 승인 후 로그인하세요.";
         return;
       }
       $("loginErr").textContent = "";
@@ -796,9 +931,32 @@
       $("newUserId").value = "";
       $("newUserPw").value = "";
       renderUsers();
-      $("userOk").textContent = "등록했습니다. 다른 폰에서도 쓰려면 「다른 폰으로 보내기」를 누르세요.";
+      $("userOk").textContent = "바로 승인된 계정입니다. 다른 기기에서는 로그인 링크를 보내 주세요.";
+      await shareLink(extraShareUrl([{ role: "User", id, hash }]), "계정이 승인되었습니다. 이 링크를 연 뒤 ID·PW로 로그인하세요.", $("userOk"), "바로 승인된 계정입니다. 로그인 링크를 보냈거나 복사했습니다.");
     };
-    $("shareUsersBtn").onclick = () => shareExtras();
+    $("inviteBtn").onclick = async () => {
+      $("userErr").textContent = "";
+      await shareLink(appUrl({ join: "1" }), "이 링크로 들어와 계정을 만든 뒤, 승인 요청을 매니저에게 보내 주세요.", $("userOk"), "가입 링크를 보냈거나 복사했습니다.");
+    };
+    $("joinBtn").onclick = async () => {
+      const id = $("joinId").value.trim();
+      const pw = $("joinPw").value;
+      $("joinErr").textContent = "";
+      $("joinOk").textContent = "";
+      if (!id || !pw) { $("joinErr").textContent = "ID와 PW를 모두 입력해 주세요."; return; }
+      if (allAuth().some(a => String(a.id).toLowerCase() === id.toLowerCase())) {
+        $("joinErr").textContent = "이미 있는 ID입니다. 승인되었다면 로그인하세요.";
+        return;
+      }
+      let hash;
+      try { hash = await digest("User|" + id + "|" + pw); }
+      catch { $("joinErr").textContent = "저장할 수 없습니다. 페이지를 새로고침해 주세요."; return; }
+      const row = { role: "User", id, hash };
+      saveOwnPending(row);
+      $("joinOk").textContent = "신청했습니다. 아래 승인 요청을 매니저에게 보내 주세요.";
+      await shareLink(appUrl({ req: b64urlEncode(JSON.stringify(row)) }), "계정 승인 요청입니다. 매니저로 로그인한 뒤 승인해 주세요.", $("joinOk"), "승인 요청을 보냈거나 복사했습니다. 매니저 승인 후 로그인하세요.");
+    };
+    $("joinBackBtn").onclick = () => show("login");
     $("logoutBtn").onclick = () => {
       clearAuto();
       $("autoSign").checked = false;
@@ -818,23 +976,30 @@
     $("adminModal").onclick = (e) => { if (e.target.id === "adminModal") $("adminModal").classList.add("hidden"); };
     document.querySelectorAll(".menus button").forEach(b => b.onclick = () => openTab(b.dataset.tab));
     $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
+    $("joinPw").addEventListener("keydown", e => { if (e.key === "Enter") $("joinBtn").click(); });
 
     const saved = autoRecord();
     const imported = importFromUrl();
-    if (imported) {
-      $("loginOk").textContent = imported + "개 계정을 이 폰에 저장했습니다. 등록한 ID·PW로 Sign in 하세요.";
+    if (imported.ted) $("loginOk").textContent = "계정이 이 기기에 저장되었습니다. ID·PW로 Sign in 하세요.";
+    if (imported.req) {
+      $("loginOk").textContent = "승인 요청이 도착했습니다. 매니저로 로그인한 뒤 User에서 승인해 주세요.";
+      openUsersAfterLogin = true;
     }
     refreshShared().finally(() => {
       const savedOk = saved && allAuth().some(a => a.role === saved.role && a.id === saved.id && a.hash === saved.hash);
-      if (savedOk && !imported) {
+      if (imported.join) {
+        show("join");
+        return;
+      }
+      if (savedOk && !imported.ted) {
         $("autoSign").checked = true;
         enter(saved.role);
-      } else {
-        if (saved && !savedOk) clearAuto();
-        show("login");
+        return;
       }
+      if (saved && !savedOk) clearAuto();
+      show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=4");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=5");
   </script>
 </body>
 </html>
