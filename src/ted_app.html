@@ -346,7 +346,7 @@
   <div id="userModal" class="modal-bg hidden">
     <div class="modal form">
       <h2>User</h2>
-      <p class="hint">계정을 만들면 그 ID와 비밀번호를 알려 주세요. 상대는 자기 기기에서 바로 로그인할 수 있고, 들어가서 비밀번호를 바꿀 수 있습니다.</p>
+      <p class="hint">휴대폰에서도 매니저로 로그인하면 계정을 만들 수 있습니다. 만든 ID와 임시 비밀번호를 알려 주세요.</p>
       <div id="userList"></div>
       <label for="newUserId">ID</label>
       <input id="newUserId" autocomplete="off"/>
@@ -395,6 +395,8 @@
     let sharedUsers = [];
     let currentUser = null;
     let pwTarget = null;
+    let writeToken = "";
+    const WRITE_KEY = "ted_write_token";
 
     function clipChart(c) {
       const dates = (c.dates || []).slice();
@@ -484,6 +486,41 @@
       }
       return null;
     }
+    function b64ToBytes(b64) {
+      const bin = atob(String(b64 || "").replace(/\s/g, ""));
+      return Uint8Array.from(bin, c => c.charCodeAt(0));
+    }
+    async function unlockSyncToken(pw) {
+      const local = String(window.TED_SYNC_TOKEN || "").trim();
+      if (local) return local;
+      const box = BOOT.syncBox;
+      if (!box || !box.ct || !pw || !(window.crypto && crypto.subtle)) return "";
+      const salt = b64ToBytes(box.salt);
+      const iv = b64ToBytes(box.iv);
+      const ct = b64ToBytes(box.ct);
+      const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+      const key = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt, iterations: Number(box.iter || 210000), hash: "SHA-256" },
+        base,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+      );
+      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+      return new TextDecoder().decode(pt).trim();
+    }
+    function rememberWriteToken(token) {
+      writeToken = String(token || "").trim();
+      if (writeToken) localStorage.setItem(WRITE_KEY, writeToken);
+      else localStorage.removeItem(WRITE_KEY);
+    }
+    function loadWriteToken() {
+      writeToken = (String(window.TED_SYNC_TOKEN || "") || localStorage.getItem(WRITE_KEY) || "").trim();
+    }
+    function clearWriteToken() {
+      writeToken = "";
+      localStorage.removeItem(WRITE_KEY);
+    }
     function utf8ToB64(text) {
       const bytes = new TextEncoder().encode(text);
       let bin = "";
@@ -491,7 +528,7 @@
       return btoa(bin);
     }
     async function githubSaveUsers(list) {
-      const token = String(window.TED_SYNC_TOKEN || "").trim();
+      const token = (writeToken || String(window.TED_SYNC_TOKEN || "") || localStorage.getItem(WRITE_KEY) || "").trim();
       if (!token) return false;
       const headers = {
         Authorization: "Bearer " + token,
@@ -885,6 +922,7 @@
       $("future").innerHTML = renderFuture(BOOT.future) + weightsHtml(BOOT.weights);
       $("userAddBtn").classList.toggle("hidden", role !== "Manager");
       $("pwChangeBtn").classList.toggle("hidden", role !== "User");
+      if (role === "Manager") loadWriteToken();
       show("app");
       showHome();
     }
@@ -905,6 +943,12 @@
       const h = await digest(acc.role + "|" + acc.id + "|" + pw);
       if ($("autoSign").checked) saveAuto(acc.role, acc.id, h);
       else clearAuto();
+      if (acc.role === "Manager") {
+        try { rememberWriteToken(await unlockSyncToken(pw)); }
+        catch { loadWriteToken(); }
+      } else {
+        clearWriteToken();
+      }
       enter(acc.role, acc.id);
     };
     $("addUserBtn").onclick = async () => {
@@ -930,10 +974,11 @@
       renderUsers();
       $("userOk").textContent = synced
         ? "계정을 만들었습니다. 이 ID와 임시 비밀번호를 알려 주세요. 상대는 자기 기기에서 바로 로그인할 수 있습니다."
-        : "계정을 만들었습니다. 이 ID와 임시 비밀번호를 알려 주세요.";
+        : "이 기기에는 저장됐습니다. 다른 기기에도 바로 쓰려면 매니저 비밀번호로 다시 로그인해 주세요.";
     };
     $("logoutBtn").onclick = () => {
       currentUser = null;
+      clearWriteToken();
       clearAuto();
       $("autoSign").checked = false;
       $("userModal").classList.add("hidden");

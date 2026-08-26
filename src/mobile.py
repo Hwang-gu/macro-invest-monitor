@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -27,6 +28,66 @@ CAT_KO = {
 
 def _hash_account(role: str, user_id: str, pw: str) -> str:
     return hashlib.sha256(f"{role}|{user_id}|{pw}".encode("utf-8")).hexdigest()
+
+
+SYNC_BOX_PATH = ROOT / "data" / "ted_sync_box.json"
+SYNC_KDF_ITERS = 210_000
+
+
+def _b64(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii")
+
+
+def _make_sync_box(token: str, password: str) -> dict[str, Any] | None:
+    try:
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        from cryptography.hazmat.primitives import hashes
+    except ImportError:
+        return None
+    salt = os.urandom(16)
+    key = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=SYNC_KDF_ITERS,
+    ).derive(password.encode("utf-8"))
+    nonce = os.urandom(12)
+    ct = AESGCM(key).encrypt(nonce, token.encode("utf-8"), None)
+    return {
+        "v": 1,
+        "iter": SYNC_KDF_ITERS,
+        "salt": _b64(salt),
+        "iv": _b64(nonce),
+        "ct": _b64(ct),
+    }
+
+
+def _load_sync_box() -> dict[str, Any] | None:
+    if not SYNC_BOX_PATH.exists():
+        return None
+    try:
+        data = json.loads(SYNC_BOX_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or not data.get("ct"):
+        return None
+    return data
+
+
+def _save_sync_box(box: dict[str, Any]) -> None:
+    SYNC_BOX_PATH.write_text(json.dumps(box, indent=2) + "\n", encoding="utf-8")
+
+
+def _sync_box_for_boot() -> dict[str, Any] | None:
+    token = os.getenv("TED_SYNC_TOKEN", "").strip()
+    manager = next((a for a in ted_accounts() if a.get("role") == "Manager"), None)
+    if token and manager and manager.get("pw"):
+        box = _make_sync_box(token, str(manager["pw"]))
+        if box:
+            _save_sync_box(box)
+            return box
+    return _load_sync_box()
 
 
 def _extra_user_records() -> list[dict[str, Any]]:
@@ -158,6 +219,9 @@ def write_mobile_app(
         "weights": _weights(report.get("asset_scores")),
         "disclaimer": report.get("disclaimer"),
     }
+    box = _sync_box_for_boot()
+    if box:
+        boot["syncBox"] = box
     html = TEMPLATE.read_text(encoding="utf-8").replace(
         "__BOOT__", json.dumps(boot, ensure_ascii=False, default=str).replace("</", "<\\/")
     )

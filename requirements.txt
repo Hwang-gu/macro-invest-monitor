@@ -12,3 +12,4 @@ google-genai>=1.0
 finance-datareader>=0.9.50
 lxml>=5.3
 openpyxl>=3.1
+cryptography>=43.0
