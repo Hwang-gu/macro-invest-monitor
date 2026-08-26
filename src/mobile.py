@@ -16,6 +16,7 @@ from .process import load_events
 
 TEMPLATE = ROOT / "src" / "ted_app.html"
 LOGO = ROOT / "src" / "logo.jpg"
+FONT_DIR = ROOT / "src" / "fonts"
 CAT_KO = {
     "war": "전쟁",
     "disease": "질병",
@@ -270,6 +271,12 @@ def write_mobile_app(
     )
     if LOGO.exists():
         shutil.copy2(LOGO, APP_DIR / "logo.jpg")
+    if FONT_DIR.exists():
+        dest = APP_DIR / "fonts"
+        dest.mkdir(parents=True, exist_ok=True)
+        for font in FONT_DIR.iterdir():
+            if font.is_file():
+                shutil.copy2(font, dest / font.name)
     (APP_DIR / "sw.js").write_text(
         """self.addEventListener("install", e => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(clients.claim()));

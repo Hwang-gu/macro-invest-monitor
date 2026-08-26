@@ -15,23 +15,24 @@
   <style>
     @font-face {
       font-family: "Chosunilbo Myeongjo";
-      src: url("https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@1.0/Chosunilbo_myungjo.woff") format("woff");
-      font-weight: normal;
+      src: url("fonts/ChosunNM.woff2") format("woff2");
+      font-weight: 400;
+      font-display: swap;
+      unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+A960-A97F, U+D7B0-D7FF, U+3000-303F, U+FF00-FFEF;
+    }
+    @font-face {
+      font-family: "Arial";
+      src: url("fonts/Arial.woff2") format("woff2"), local("Arial");
+      font-weight: 400;
+      font-style: normal;
       font-display: swap;
     }
     @font-face {
-      font-family: "TedType";
-      src: url("https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@1.0/Chosunilbo_myungjo.woff") format("woff");
-      font-weight: normal;
+      font-family: "Arial";
+      src: url("fonts/Arial-Bold.woff2") format("woff2"), local("Arial Bold"), local("Arial");
+      font-weight: 700;
+      font-style: normal;
       font-display: swap;
-      unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+A960-A97F, U+D7B0-D7FF;
-    }
-    @font-face {
-      font-family: "TedType";
-      src: local("Arial"), local("Helvetica Neue"), local("Helvetica");
-      font-weight: normal;
-      font-display: swap;
-      unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF;
     }
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -39,7 +40,7 @@
       margin: 0; min-height: 100%;
       background: #070b14;
       color: #ffffff;
-      font-family: "TedType", "Chosunilbo Myeongjo", Arial, sans-serif;
+      font-family: Arial, "Chosunilbo Myeongjo", sans-serif;
     }
     body {
       display: flex; justify-content: center;
@@ -157,7 +158,14 @@
     .modal.form { text-align: left; }
     .modal.form h2 { text-align: center; font-size: 1.05rem; letter-spacing: .08em; margin-bottom: 8px; }
     .weights div, .user-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1c2a44; }
-    .user-row button { width: auto; padding: 6px 10px; font-size: .8rem; margin: 0; }
+    .user-row { font-size: .82rem; gap: 8px; }
+    .user-row > span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #d7dee8;
+    }
+    .user-row button { width: auto; padding: 6px 10px; font-size: .82rem; margin: 0; }
     .user-row .row-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .pw-wrap { position: relative; }
     .pw-wrap input { padding-right: 52px; width: 100%; }
@@ -289,7 +297,7 @@
       </div>
       <div class="err" id="loginErr"></div>
       <div class="ok" id="loginOk"></div>
-      <p class="hint" id="loginHint">매니저가 만들어 준 ID와 비밀번호로 로그인하세요. 들어간 뒤 비밀번호를 바꿀 수 있습니다.</p>
+      <p class="hint" id="loginHint">Log in with the admin-provided ID and password, then change your password.</p>
       <button class="primary" id="loginBtn" type="button">Sign in</button>
       <button class="ghost" id="adminBtn" type="button">Information</button>
       </div>
@@ -328,19 +336,19 @@
           <span class="dot" style="background:#e0a050"></span>지정학
           <span class="dot" style="background:#5aa0ff"></span>정책
         </div>
-        <h3 class="chart-title">이슈 타임라인</h3>
+        <h3 class="chart-title">Issue Timeline</h3>
         <div class="chart-scroll"><div class="chart issues" id="chartIssues"></div></div>
-        <h3 class="chart-title">추세 비교</h3>
+        <h3 class="chart-title">Trend Comparison</h3>
         <div class="chart-scroll"><div class="chart compare" id="chartCompare"></div></div>
-        <h3 class="chart-title">기준금리</h3>
+        <h3 class="chart-title">Policy Rates</h3>
         <div class="chart-scroll"><div class="chart" id="chartRates"></div></div>
-        <h3 class="chart-title">코스피 · 코스닥</h3>
+        <h3 class="chart-title">KOSPI · KOSDAQ</h3>
         <div class="chart-scroll"><div class="chart" id="chartKorea"></div></div>
-        <h3 class="chart-title">나스닥</h3>
+        <h3 class="chart-title">NASDAQ</h3>
         <div class="chart-scroll"><div class="chart" id="chartNasdaq"></div></div>
-        <h3 class="chart-title">금</h3>
+        <h3 class="chart-title">Gold</h3>
         <div class="chart-scroll"><div class="chart" id="chartGold"></div></div>
-        <h3 class="chart-title">비트코인</h3>
+        <h3 class="chart-title">Bitcoin</h3>
         <div class="chart-scroll"><div class="chart" id="chartBtc"></div></div>
       </div>
       <div id="present" class="panel hidden"></div>
@@ -810,14 +818,23 @@
     };
     const LANES = ["war", "disease", "technology", "financial_crisis", "geopolitics", "policy"];
     const LANE_KO = {war:"전쟁", disease:"질병", technology:"신기술", financial_crisis:"위기", geopolitics:"지정학", policy:"정책"};
+    const COLOR = {
+      kospi: "#3b82ff",
+      kosdaq: "#ff3d7a",
+      nasdaq: "#22d67a",
+      gold: "#ffcc00",
+      bitcoin: "#ff6b00",
+      us_ffr: "#00e5ff",
+      kr_call: "#c084fc"
+    };
     const COMPARE = [
-      {key: "kospi", name: "코스피", color: "#7eb6ff"},
-      {key: "kosdaq", name: "코스닥", color: "#f0c36a"},
-      {key: "nasdaq", name: "나스닥", color: "#8fd19e"},
-      {key: "gold", name: "금", color: "#e2c36b"},
-      {key: "bitcoin", name: "비트코인", color: "#c9a27a"},
-      {key: "us_ffr", name: "미국 기준금리", color: "#9ad0ff"},
-      {key: "kr_call", name: "한국 기준금리", color: "#ffd27a"}
+      {key: "kospi", name: "코스피", color: COLOR.kospi},
+      {key: "kosdaq", name: "코스닥", color: COLOR.kosdaq},
+      {key: "nasdaq", name: "나스닥", color: COLOR.nasdaq},
+      {key: "gold", name: "금", color: COLOR.gold},
+      {key: "bitcoin", name: "비트코인", color: COLOR.bitcoin},
+      {key: "us_ffr", name: "미국 기준금리", color: COLOR.us_ffr},
+      {key: "kr_call", name: "한국 기준금리", color: COLOR.kr_call}
     ];
     const PLOT_CFG = {
       responsive: true,
@@ -887,13 +904,13 @@
             {count: 1, label: "1Y", step: "year", stepmode: "backward"},
             {count: 5, label: "5Y", step: "year", stepmode: "backward"},
             {count: 10, label: "10Y", step: "year", stepmode: "backward"},
-            {step: "all", label: "전체"}
+            {step: "all", label: "All"}
           ]
         }
       };
       return Object.assign({
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
-        font: {color: "#fff", family: "TedType, Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
+        font: {color: "#fff", family: "Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
         margin: {l: 46, r: 16, t: 48, b: 16},
         legend: {orientation: "h", y: -0.42, font: {size: 10}},
         hovermode: "x unified",
@@ -922,7 +939,7 @@
       });
       Plotly.newPlot("chartIssues", traces, {
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
-        font: {color: "#fff", family: "TedType, Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
+        font: {color: "#fff", family: "Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
         margin: {l: 58, r: 16, t: 40, b: 40},
         dragmode: "pan",
         hovermode: "closest",
@@ -954,30 +971,30 @@
         name: s.name,
         type: "scatter",
         mode: "lines",
-        line: {color: s.color, width: 1.8}
+        line: {color: s.color, width: 2.2}
       })).concat(issueHover(100));
-      Plotly.newPlot("chartCompare", compare, chartLayout({title: "상대", range: [-2, 108]}), PLOT_CFG);
+      Plotly.newPlot("chartCompare", compare, chartLayout({title: "Relative", range: [-2, 108]}), PLOT_CFG);
 
       Plotly.newPlot("chartRates", [
-        {x: CHART_XS, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
-        {x: CHART_XS, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
+        {x: CHART_XS, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: COLOR.us_ffr, width: 2.2}},
+        {x: CHART_XS, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: COLOR.kr_call, width: 2.2}}
       ].concat(issueHover(6)), chartLayout({title: "%"}), PLOT_CFG);
 
       Plotly.newPlot("chartKorea", [
-        {x: CHART_XS, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
-        {x: CHART_XS, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
-      ], chartLayout({title: "종가"}), PLOT_CFG);
+        {x: CHART_XS, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: COLOR.kospi, width: 2.2}},
+        {x: CHART_XS, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: COLOR.kosdaq, width: 2.2}}
+      ], chartLayout({title: "Close"}), PLOT_CFG);
 
       Plotly.newPlot("chartNasdaq", [
-        {x: CHART_XS, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: "#8fd19e"}}
-      ], chartLayout({title: "종가"}), PLOT_CFG);
+        {x: CHART_XS, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: COLOR.nasdaq, width: 2.2}}
+      ], chartLayout({title: "Close"}), PLOT_CFG);
 
       Plotly.newPlot("chartGold", [
-        {x: CHART_XS, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: "#e2c36b"}}
+        {x: CHART_XS, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: COLOR.gold, width: 2.2}}
       ], chartLayout({title: "USD"}), PLOT_CFG);
 
       Plotly.newPlot("chartBtc", [
-        {x: CHART_XS, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: "#c9a27a"}}
+        {x: CHART_XS, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: COLOR.bitcoin, width: 2.2}}
       ], chartLayout({title: "USD"}), PLOT_CFG);
       ["chartIssues","chartCompare","chartRates","chartKorea","chartNasdaq","chartGold","chartBtc"].forEach(id => {
         const el = $(id);
@@ -1178,7 +1195,7 @@
 
     try { localStorage.removeItem("ted_auto_sign"); } catch {}
     refreshShared().finally(() => show("login"));
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=7");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=9");
   </script>
 </body>
 </html>
