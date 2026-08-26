@@ -4,5 +4,18 @@
     "id": "leeyunjun2@naver.com",
     "hash": "4db48476912e04ea80adcf946610e1eb7891368757bd3cce3f6ee87491b023a4",
     "updated": 1787763154088
+  },
+  {
+    "role": "User",
+    "id": "gustjd9716@naver.com",
+    "hash": "26e499fcc0270595aa187aa3777c1d5c4a1d98d3954218cbcd9033ad9735a0a5",
+    "updated": 1787764955043,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "QVFz15CuZUvPh+eKFU3/hQ==",
+      "iv": "YO5z6jZPJMaGZiP5",
+      "ct": "A18SLOE6gXN2PLHgWujXFPbWEAKxMFR82dlxCwxnEf/d6c4rJvvbyltId4+aoGtSl22f6REmldVwbk1md8MKxYGSHjliy8ypB+KU1AFSUqxZMwp4g6JQz2rijm+5u9pUcGcdixlE/km5LjDprQ=="
+    }
   }
 ]
