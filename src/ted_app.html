@@ -19,13 +19,27 @@
       font-weight: normal;
       font-display: swap;
     }
+    @font-face {
+      font-family: "TedType";
+      src: url("https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@1.0/Chosunilbo_myungjo.woff") format("woff");
+      font-weight: normal;
+      font-display: swap;
+      unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+A960-A97F, U+D7B0-D7FF;
+    }
+    @font-face {
+      font-family: "TedType";
+      src: local("Arial"), local("Helvetica Neue"), local("Helvetica");
+      font-weight: normal;
+      font-display: swap;
+      unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF;
+    }
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
     html, body {
       margin: 0; min-height: 100%;
       background: #070b14;
       color: #ffffff;
-      font-family: "Chosunilbo Myeongjo", "조선일보명조", "Times New Roman", serif;
+      font-family: "TedType", "Chosunilbo Myeongjo", Arial, sans-serif;
     }
     body {
       display: flex; justify-content: center;
@@ -64,15 +78,6 @@
     .ghost { background: transparent; margin-top: 10px; }
     .err { color: #ffb4b4; font-size: .85rem; min-height: 1.2em; margin-top: 8px; text-align: center; }
     .hidden { display: none !important; }
-    .check-row {
-      display: flex; align-items: center; gap: 10px;
-      margin: 14px 0 4px;
-    }
-    .check-row input[type="checkbox"] {
-      width: 18px; height: 18px; padding: 0; margin: 0;
-      accent-color: #6ea2e6;
-    }
-    .check-row label { margin: 0; }
     .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; gap: 10px; }
     .top small { color: #b7c3d4; font-size: .78rem; }
     .top-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
@@ -182,7 +187,7 @@
         aspect-ratio: 16 / 9;
         height: auto;
         overflow: auto;
-        padding: 22px 32px 24px;
+        padding: 32px 56px 40px;
         border-radius: 16px;
         border-color: #3a5478;
         box-shadow: 0 16px 48px rgba(0,0,0,.45);
@@ -206,26 +211,37 @@
       }
       #app.home .menus {
         flex-direction: column;
-        align-items: stretch;
+        align-items: center;
         justify-content: center;
-        max-width: 420px;
+        max-width: 220px;
         width: 100%;
         margin-left: auto;
         margin-right: auto;
-        gap: 12px;
+        gap: 36px;
+        padding: 40px 0 56px;
       }
       #app.home .menus button {
-        padding: 18px 12px;
-        font-size: 1.08rem;
+        width: 100%;
+        padding: 8px 14px;
+        font-size: .84rem;
         height: auto;
+        letter-spacing: .14em;
       }
       .menus {
         flex-direction: row;
-        gap: 12px;
-        margin-bottom: 18px;
+        justify-content: center;
+        gap: 20px;
+        margin-bottom: 28px;
       }
-      .menus button { flex: 1; }
-      .top { margin-bottom: 14px; }
+      .menus button {
+        flex: 0 0 auto;
+        width: auto;
+        min-width: 96px;
+        padding: 8px 16px;
+        font-size: .86rem;
+        letter-spacing: .1em;
+      }
+      .top { margin-bottom: 20px; }
       .chart-scroll { overflow-x: hidden; }
       .chart {
         min-width: 0;
@@ -270,10 +286,6 @@
       <div class="pw-wrap">
         <input id="pw" type="password" autocomplete="current-password"/>
         <button class="pw-toggle" type="button" data-for="pw">보기</button>
-      </div>
-      <div class="check-row">
-        <input id="autoSign" type="checkbox"/>
-        <label for="autoSign">Auto Sign in</label>
       </div>
       <div class="err" id="loginErr"></div>
       <div class="ok" id="loginOk"></div>
@@ -346,19 +358,18 @@
   <div id="userModal" class="modal-bg hidden">
     <div class="modal form">
       <h2>User</h2>
-      <p class="hint">휴대폰에서도 매니저로 로그인하면 계정을 만들 수 있습니다. 만든 ID와 임시 비밀번호를 알려 주세요.</p>
       <div id="userList"></div>
       <label for="newUserId">ID</label>
       <input id="newUserId" autocomplete="off"/>
-      <label for="newUserPw">임시 비밀번호</label>
+      <label for="newUserPw">First Password</label>
       <div class="pw-wrap">
         <input id="newUserPw" type="password" autocomplete="new-password"/>
         <button class="pw-toggle" type="button" data-for="newUserPw">보기</button>
       </div>
       <div class="err" id="userErr"></div>
       <div class="ok" id="userOk"></div>
-      <button class="primary" id="addUserBtn" type="button">계정 만들기</button>
-      <button class="ghost" id="closeUser" type="button">닫기</button>
+      <button class="primary" id="addUserBtn" type="button">Add new account</button>
+      <button class="ghost" id="closeUser" type="button">Back</button>
     </div>
   </div>
 
@@ -389,7 +400,6 @@
     const BOOT = JSON.parse(document.getElementById("boot").textContent);
     const $ = (id) => document.getElementById(id);
     const EXTRA_KEY = "ted_extra_users";
-    const AUTO_KEY = "ted_auto_sign";
     const USERS_API = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/data/ted_users.json";
     const USERS_RAW = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ted_users.json";
     let sharedUsers = [];
@@ -398,10 +408,21 @@
     let writeToken = "";
     const WRITE_KEY = "ted_write_token";
 
+    function ymKey(v) {
+      const s = String(v || "");
+      return s.length >= 7 ? s.slice(0, 7) : s;
+    }
+    function toLocalNoon(value, dayFallback) {
+      const parts = String(value || "").split(/[-T :]/).map(Number);
+      const y = parts[0] || 2000;
+      const m = (parts[1] || 1) - 1;
+      const d = parts[2] || dayFallback || 1;
+      return new Date(y, m, d, 12, 0, 0);
+    }
     function clipChart(c) {
       const dates = (c.dates || []).slice();
       let i0 = 0;
-      while (i0 < dates.length && String(dates[i0]) < "2000-01") i0++;
+      while (i0 < dates.length && ymKey(dates[i0]) < "2000-01") i0++;
       const out = { dates: dates.slice(i0) };
       Object.keys(c || {}).forEach(k => {
         if (k === "dates") return;
@@ -410,8 +431,15 @@
       return out;
     }
     const CHART = clipChart(BOOT.chart || { dates: [] });
-    BOOT.events = (BOOT.events || []).filter(ev => String(ev.end || "") >= "2000-01-01").map(ev => Object.assign({}, ev, {
-      start: String(ev.start || "") < "2000-01-01" ? "2000-01-01" : ev.start
+    const CHART_XS = (CHART.dates || []).map(d => toLocalNoon(d, 15));
+    const AXIS_X0 = toLocalNoon("2000-01-01", 1);
+    const AXIS_X1 = CHART.dates.length
+      ? toLocalNoon(String(CHART.dates[CHART.dates.length - 1]).length === 7
+          ? CHART.dates[CHART.dates.length - 1] + "-28"
+          : CHART.dates[CHART.dates.length - 1], 28)
+      : toLocalNoon("2026-12-28", 28);
+    BOOT.events = (BOOT.events || []).filter(ev => ymKey(ev.end || "") >= "2000-01").map(ev => Object.assign({}, ev, {
+      start: ymKey(ev.start) < "2000-01" ? "2000-01-01" : ev.start
     }));
 
     function extraUsers() {
@@ -672,24 +700,14 @@
       else list.push(row);
       return saveUserStore(list);
     }
-    function autoRecord() {
-      try { return JSON.parse(localStorage.getItem(AUTO_KEY) || "null"); }
-      catch { return null; }
-    }
-    function saveAuto(role, id, hash) {
-      localStorage.setItem(AUTO_KEY, JSON.stringify({ role, id, hash }));
-    }
-    function clearAuto() {
-      localStorage.removeItem(AUTO_KEY);
-    }
     function renderUsers() {
       const store = userStore();
       const locked = envIds();
       const rows = store.map((a, i) => {
         const del = locked.has(String(a.id).toLowerCase())
           ? ""
-          : `<button type="button" data-del="${i}">삭제</button>`;
-        return `<div class="user-row"><span>${escapeHtml(a.id)}</span><span class="row-actions"><button type="button" data-pw="${i}">암호 변경</button>${del}</span></div>`;
+          : `<button type="button" data-del="${i}">Delete</button>`;
+        return `<div class="user-row"><span>${escapeHtml(a.id)}</span><span class="row-actions"><button type="button" data-pw="${i}">PW Change</button>${del}</span></div>`;
       });
       $("userList").innerHTML = rows.join("") || "<p class='hint'>아직 만든 계정이 없습니다.</p>";
       $("userList").querySelectorAll("[data-del]").forEach(btn => {
@@ -740,7 +758,7 @@
       $("pwErr").textContent = "";
       $("pwOk").textContent = "";
       if (target) {
-        $("pwModalTitle").textContent = "암호 변경";
+        $("pwModalTitle").textContent = "PW Change";
         $("pwModalHint").textContent = target.id + " 계정의 새 비밀번호를 입력하세요.";
       } else {
         $("pwModalTitle").textContent = "비밀번호 변경";
@@ -824,7 +842,7 @@
         const pal = ISSUE[ev.category] || ISSUE.financial_crisis;
         return {
           type: "rect", xref: "x", yref: "paper",
-          x0: ev.start, x1: ev.end, y0: 0, y1: 1,
+          x0: toLocalNoon(ev.start, 1), x1: toLocalNoon(ev.end, 1), y0: 0, y1: 1,
           fillcolor: pal.fill, line: {width: 1, color: pal.line}, layer: "below"
         };
       });
@@ -833,7 +851,7 @@
     function issueHover(yTop) {
       if (yTop == null) return [];
       return (BOOT.events || []).map(ev => ({
-        x: [ev.start],
+        x: [toLocalNoon(ev.start, 1)],
         y: [yTop],
         type: "scatter",
         mode: "markers",
@@ -846,11 +864,20 @@
     }
 
     function chartLayout(yaxis, extra) {
-      const last = CHART.dates.length ? CHART.dates[CHART.dates.length - 1] + "-28" : "2026-12-31";
       const xaxis = {
+        type: "date",
         gridcolor: "#1c2a44", color: "#fff",
-        range: ["2000-01-01", last],
-        rangeslider: {visible: true, bgcolor: "#10192b", thickness: 0.14},
+        autorange: false,
+        range: [AXIS_X0, AXIS_X1],
+        minallowed: AXIS_X0,
+        maxallowed: AXIS_X1,
+        rangeslider: {
+          visible: true,
+          bgcolor: "#10192b",
+          thickness: 0.14,
+          autorange: false,
+          range: [AXIS_X0, AXIS_X1]
+        },
         rangeselector: {
           bgcolor: "#10192b",
           activecolor: "#1e4d8c",
@@ -866,7 +893,7 @@
       };
       return Object.assign({
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
-        font: {color: "#fff", family: "Chosunilbo Myeongjo, serif", size: 11},
+        font: {color: "#fff", family: "TedType, Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
         margin: {l: 46, r: 16, t: 48, b: 16},
         legend: {orientation: "h", y: -0.42, font: {size: 10}},
         hovermode: "x unified",
@@ -885,7 +912,7 @@
         return {
           type: "scatter",
           mode: "lines",
-          x: [ev.start, ev.end],
+          x: [toLocalNoon(ev.start, 1), toLocalNoon(ev.end, 1)],
           y: [lane, lane],
           line: {width: 18, color: pal.bar},
           name: ev.name,
@@ -895,11 +922,18 @@
       });
       Plotly.newPlot("chartIssues", traces, {
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
-        font: {color: "#fff", family: "Chosunilbo Myeongjo, serif", size: 11},
+        font: {color: "#fff", family: "TedType, Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
         margin: {l: 58, r: 16, t: 40, b: 40},
         dragmode: "pan",
         hovermode: "closest",
-        xaxis: {gridcolor: "#1c2a44", color: "#fff", range: ["2000-01-01", (CHART.dates[CHART.dates.length-1] || "2026-12") + "-28"]},
+        xaxis: {
+          type: "date",
+          gridcolor: "#1c2a44", color: "#fff",
+          autorange: false,
+          range: [AXIS_X0, AXIS_X1],
+          minallowed: AXIS_X0,
+          maxallowed: AXIS_X1
+        },
         yaxis: {
           gridcolor: "#1c2a44", color: "#fff",
           tickmode: "array",
@@ -915,7 +949,7 @@
       const c = CHART;
       drawIssues();
       const compare = COMPARE.map(s => ({
-        x: c.dates,
+        x: CHART_XS,
         y: scale01(c[s.key] || []),
         name: s.name,
         type: "scatter",
@@ -925,26 +959,35 @@
       Plotly.newPlot("chartCompare", compare, chartLayout({title: "상대", range: [-2, 108]}), PLOT_CFG);
 
       Plotly.newPlot("chartRates", [
-        {x: c.dates, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
-        {x: c.dates, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
+        {x: CHART_XS, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
+        {x: CHART_XS, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
       ].concat(issueHover(6)), chartLayout({title: "%"}), PLOT_CFG);
 
       Plotly.newPlot("chartKorea", [
-        {x: c.dates, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
-        {x: c.dates, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
+        {x: CHART_XS, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: "#7eb6ff"}},
+        {x: CHART_XS, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: "#f0c36a"}}
       ], chartLayout({title: "종가"}), PLOT_CFG);
 
       Plotly.newPlot("chartNasdaq", [
-        {x: c.dates, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: "#8fd19e"}}
+        {x: CHART_XS, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: "#8fd19e"}}
       ], chartLayout({title: "종가"}), PLOT_CFG);
 
       Plotly.newPlot("chartGold", [
-        {x: c.dates, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: "#e2c36b"}}
+        {x: CHART_XS, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: "#e2c36b"}}
       ], chartLayout({title: "USD"}), PLOT_CFG);
 
       Plotly.newPlot("chartBtc", [
-        {x: c.dates, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: "#c9a27a"}}
+        {x: CHART_XS, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: "#c9a27a"}}
       ], chartLayout({title: "USD"}), PLOT_CFG);
+      ["chartIssues","chartCompare","chartRates","chartKorea","chartNasdaq","chartGold","chartBtc"].forEach(id => {
+        const el = $(id);
+        if (!el || !el.layout) return;
+        const patch = {"xaxis.range": [AXIS_X0, AXIS_X1], "xaxis.autorange": false};
+        if (el.layout.xaxis && el.layout.xaxis.rangeslider && el.layout.xaxis.rangeslider.visible) {
+          patch["xaxis.rangeslider.range"] = [AXIS_X0, AXIS_X1];
+        }
+        Plotly.relayout(el, patch);
+      });
     }
 
     function showHome() {
@@ -1004,9 +1047,6 @@
       }
       $("loginErr").textContent = "";
       $("role").value = acc.role;
-      const h = await digest(acc.role + "|" + acc.id + "|" + pw);
-      if ($("autoSign").checked) saveAuto(acc.role, acc.id, h);
-      else clearAuto();
       if (acc.role === "Manager") {
         try { rememberWriteToken(await unlockSyncToken(pw)); }
         catch { loadWriteToken(); }
@@ -1039,7 +1079,7 @@
       const pw = $("newUserPw").value;
       $("userErr").textContent = "";
       $("userOk").textContent = "";
-      if (!id || !pw) { $("userErr").textContent = "ID와 임시 비밀번호를 모두 입력해 주세요."; return; }
+      if (!id || !pw) { $("userErr").textContent = "ID와 First Password를 모두 입력해 주세요."; return; }
       if (allAuth().some(a => String(a.id).toLowerCase() === id.toLowerCase())) {
         $("userErr").textContent = "이미 있는 ID입니다.";
         return;
@@ -1059,14 +1099,12 @@
       resetPwField("newUserPw");
       renderUsers();
       $("userOk").textContent = synced
-        ? "계정을 만들었습니다. 이 ID와 임시 비밀번호를 알려 주세요. 상대는 자기 기기에서 바로 로그인할 수 있습니다."
+        ? "계정을 만들었습니다."
         : "이 기기에는 저장됐습니다. 다른 기기에도 바로 쓰려면 매니저 비밀번호로 다시 로그인해 주세요.";
     };
     $("logoutBtn").onclick = () => {
       currentUser = null;
       clearWriteToken();
-      clearAuto();
-      $("autoSign").checked = false;
       $("userModal").classList.add("hidden");
       $("pwModal").classList.add("hidden");
       show("login");
@@ -1101,13 +1139,6 @@
       catch {
         $("pwErr").textContent = "저장할 수 없습니다. 페이지를 새로고침해 주세요.";
         return;
-      }
-      if (currentUser && currentUser.role === "User" && String(currentUser.id).toLowerCase() === String(target.id).toLowerCase()) {
-        const h = await digest("User|" + target.id + "|" + pw);
-        const auto = autoRecord();
-        if (auto && auto.role === "User" && String(auto.id).toLowerCase() === String(target.id).toLowerCase()) {
-          saveAuto("User", target.id, h);
-        }
       }
       renderUsers();
       if (!synced) {
@@ -1145,22 +1176,9 @@
       if (clean !== location.pathname + location.search + location.hash) history.replaceState({}, "", clean || url.pathname);
     } catch {}
 
-    const saved = autoRecord();
-    refreshShared().finally(() => {
-      const savedOk = saved && allAuth().some(a =>
-        a.role === saved.role
-        && String(a.id).toLowerCase() === String(saved.id).toLowerCase()
-        && a.hash === saved.hash
-      );
-      if (savedOk) {
-        $("autoSign").checked = true;
-        enter(saved.role, saved.id);
-        return;
-      }
-      if (saved && !savedOk) clearAuto();
-      show("login");
-    });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=6");
+    try { localStorage.removeItem("ted_auto_sign"); } catch {}
+    refreshShared().finally(() => show("login"));
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=7");
   </script>
 </body>
 </html>
