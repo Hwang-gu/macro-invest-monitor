@@ -115,6 +115,9 @@ def _extra_user_records() -> list[dict[str, Any]]:
         updated = item.get("updated")
         if isinstance(updated, (int, float)) and updated > 0:
             row["updated"] = int(updated)
+        wrap = item.get("wrap")
+        if isinstance(wrap, dict) and wrap.get("ct"):
+            row["wrap"] = wrap
         rows.append(row)
     return rows
 

@@ -442,6 +442,7 @@
         hash: String(a.hash).toLowerCase(),
         updated: Number(a.updated || 0)
       };
+      if (a.wrap && a.wrap.ct) row.wrap = a.wrap;
       if (!prev || row.updated >= Number(prev.updated || 0)) map.set(key, row);
     }
     function allAuth() {
@@ -486,14 +487,16 @@
       }
       return null;
     }
+    function bytesToB64(bytes) {
+      let bin = "";
+      bytes.forEach(b => bin += String.fromCharCode(b));
+      return btoa(bin);
+    }
     function b64ToBytes(b64) {
       const bin = atob(String(b64 || "").replace(/\s/g, ""));
       return Uint8Array.from(bin, c => c.charCodeAt(0));
     }
-    async function unlockSyncToken(pw) {
-      const local = String(window.TED_SYNC_TOKEN || "").trim();
-      if (local) return local;
-      const box = BOOT.syncBox;
+    async function unlockBox(pw, box) {
       if (!box || !box.ct || !pw || !(window.crypto && crypto.subtle)) return "";
       const salt = b64ToBytes(box.salt);
       const iv = b64ToBytes(box.iv);
@@ -509,17 +512,46 @@
       const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
       return new TextDecoder().decode(pt).trim();
     }
+    async function lockBox(pw, text) {
+      if (!pw || !text || !(window.crypto && crypto.subtle)) return null;
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+      const key = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt, iterations: 210000, hash: "SHA-256" },
+        base,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt"]
+      );
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(text)));
+      return { v: 1, iter: 210000, salt: bytesToB64(salt), iv: bytesToB64(iv), ct: bytesToB64(ct) };
+    }
+    async function unlockSyncToken(pw) {
+      const local = String(window.TED_SYNC_TOKEN || "").trim();
+      if (local) return local;
+      return unlockBox(pw, BOOT.syncBox);
+    }
+    function currentWriteToken() {
+      return (writeToken || String(window.TED_SYNC_TOKEN || "") || localStorage.getItem(WRITE_KEY) || "").trim();
+    }
     function rememberWriteToken(token) {
       writeToken = String(token || "").trim();
       if (writeToken) localStorage.setItem(WRITE_KEY, writeToken);
       else localStorage.removeItem(WRITE_KEY);
     }
     function loadWriteToken() {
-      writeToken = (String(window.TED_SYNC_TOKEN || "") || localStorage.getItem(WRITE_KEY) || "").trim();
+      writeToken = currentWriteToken();
     }
     function clearWriteToken() {
       writeToken = "";
       localStorage.removeItem(WRITE_KEY);
+    }
+    async function wrapForPassword(pw) {
+      const token = currentWriteToken();
+      if (!token || !pw) return null;
+      try { return await lockBox(pw, token); }
+      catch { return null; }
     }
     function utf8ToB64(text) {
       const bytes = new TextEncoder().encode(text);
@@ -528,41 +560,56 @@
       return btoa(bin);
     }
     async function githubSaveUsers(list) {
-      const token = (writeToken || String(window.TED_SYNC_TOKEN || "") || localStorage.getItem(WRITE_KEY) || "").trim();
+      const token = currentWriteToken();
       if (!token) return false;
       const headers = {
         Authorization: "Bearer " + token,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28"
       };
+      const putOnce = async (sha) => {
+        const payload = {
+          message: "update ted users",
+          content: utf8ToB64(JSON.stringify(list, null, 2)),
+          branch: "main"
+        };
+        if (sha) payload.sha = sha;
+        const r = await fetch(USERS_API, {
+          method: "PUT",
+          headers: Object.assign({ "Content-Type": "application/json" }, headers),
+          body: JSON.stringify(payload)
+        });
+        return r;
+      };
       let sha;
       try {
         const cur = await fetch(USERS_API, { headers });
         if (cur.ok) sha = (await cur.json()).sha;
-      } catch { return false; }
-      const body = JSON.stringify(list, null, 2);
+      } catch {}
       try {
-        const r = await fetch(USERS_API, {
-          method: "PUT",
-          headers: Object.assign({ "Content-Type": "application/json" }, headers),
-          body: JSON.stringify({
-            message: "update ted users",
-            content: utf8ToB64(body),
-            sha
-          })
-        });
+        let r = await putOnce(sha);
+        if (r.status === 409) {
+          const cur = await fetch(USERS_API, { headers });
+          if (cur.ok) sha = (await cur.json()).sha;
+          r = await putOnce(sha);
+        }
         return r.ok;
       } catch {
         return false;
       }
     }
-    async function saveUserStore(list) {
-      const rows = list.filter(validUser).map(a => ({
+    function toUserRow(a) {
+      const row = {
         role: "User",
         id: String(a.id).trim(),
         hash: String(a.hash).toLowerCase(),
-        updated: Number(a.updated || Date.now())
-      }));
+        updated: Number(a.updated || 0)
+      };
+      if (a.wrap && a.wrap.ct) row.wrap = a.wrap;
+      return row;
+    }
+    async function saveUserStore(list) {
+      const rows = list.filter(validUser).map(a => toUserRow(Object.assign({}, a, { updated: Number(a.updated || Date.now()) })));
       saveExtraUsers(rows);
       sharedUsers = rows.slice();
       return githubSaveUsers(rows);
@@ -588,12 +635,7 @@
         try {
           const data = await load();
           if (!data) continue;
-          sharedUsers = (Array.isArray(data) ? data : []).filter(validUser).map(a => ({
-            role: "User",
-            id: String(a.id).trim(),
-            hash: String(a.hash).toLowerCase(),
-            updated: Number(a.updated || 0)
-          }));
+          sharedUsers = (Array.isArray(data) ? data : []).filter(validUser).map(toUserRow);
           return;
         } catch {}
       }
@@ -602,7 +644,11 @@
       const hash = await digest("User|" + id + "|" + pw);
       const list = mutableUsers();
       const key = String(id).toLowerCase();
+      const prev = list.find(a => String(a.id).toLowerCase() === key);
       const row = { role: "User", id, hash, updated: Date.now() };
+      const wrap = await wrapForPassword(pw);
+      if (wrap) row.wrap = wrap;
+      else if (prev && prev.wrap) row.wrap = prev.wrap;
       const idx = list.findIndex(a => String(a.id).toLowerCase() === key);
       if (idx >= 0) list[idx] = row;
       else list.push(row);
@@ -946,8 +992,16 @@
       if (acc.role === "Manager") {
         try { rememberWriteToken(await unlockSyncToken(pw)); }
         catch { loadWriteToken(); }
+        if (currentWriteToken() && mutableUsers().length) {
+          try { await saveUserStore(mutableUsers()); }
+          catch {}
+        }
       } else {
-        clearWriteToken();
+        const rec = userStore().find(a => String(a.id).toLowerCase() === String(acc.id).toLowerCase());
+        try {
+          if (rec && rec.wrap) rememberWriteToken(await unlockBox(pw, rec.wrap));
+          else clearWriteToken();
+        } catch { clearWriteToken(); }
       }
       enter(acc.role, acc.id);
     };
@@ -965,7 +1019,10 @@
       try { hash = await digest("User|" + id + "|" + pw); }
       catch { $("userErr").textContent = "저장할 수 없습니다. 페이지를 새로고침해 주세요."; return; }
       const list = mutableUsers();
-      list.push({ role: "User", id, hash, updated: Date.now() });
+      const row = { role: "User", id, hash, updated: Date.now() };
+      const wrap = await wrapForPassword(pw);
+      if (wrap) row.wrap = wrap;
+      list.push(row);
       let synced = false;
       try { synced = await saveUserStore(list); }
       catch { $("userErr").textContent = "이 브라우저에 계정을 저장하지 못했습니다."; return; }
@@ -1010,9 +1067,9 @@
         $("pwErr").textContent = "이 계정은 여기서 바꿀 수 없습니다.";
         return;
       }
-      try {
-        await setUserPassword(target.id, pw);
-      } catch {
+      let synced = false;
+      try { synced = await setUserPassword(target.id, pw); }
+      catch {
         $("pwErr").textContent = "저장할 수 없습니다. 페이지를 새로고침해 주세요.";
         return;
       }
@@ -1024,9 +1081,13 @@
         }
       }
       renderUsers();
+      if (!synced) {
+        $("pwErr").textContent = "이 기기에는 바뀌었습니다. 다른 기기에도 쓰려면 매니저로 한 번 로그인해 주세요.";
+        return;
+      }
       $("pwOk").textContent = pwTarget
         ? "변경했습니다. 상대에게 새 비밀번호를 알려 주세요."
-        : "변경했습니다.";
+        : "변경했습니다. 다른 기기에서도 새 비밀번호로 로그인할 수 있습니다.";
     };
     $("closePw").onclick = () => {
       $("pwModal").classList.add("hidden");
