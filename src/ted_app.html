@@ -155,6 +155,87 @@
     .user-row button { width: auto; padding: 6px 10px; font-size: .8rem; margin: 0; }
     .hint { color: #b7c3d4; font-size: .78rem; margin: 8px 0 12px; }
     .ok { color: #9ad0a8; font-size: .85rem; min-height: 1.2em; margin-top: 8px; text-align: center; }
+
+    @media (min-width: 960px) {
+      html, body { height: 100%; }
+      body {
+        align-items: center;
+        min-height: 100vh;
+        padding: 16px;
+        background: #05080f;
+      }
+      .shell {
+        display: flex;
+        flex-direction: column;
+        width: min(96vw, calc((100vh - 32px) * 16 / 9));
+        max-width: none;
+        min-height: 0;
+        aspect-ratio: 16 / 9;
+        height: auto;
+        overflow: auto;
+        padding: 22px 32px 24px;
+        border-radius: 16px;
+        border-color: #3a5478;
+        box-shadow: 0 16px 48px rgba(0,0,0,.45);
+      }
+      #login:not(.hidden) {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        justify-items: center;
+        width: 100%;
+        gap: 24px 48px;
+      }
+      #login .brand { margin-bottom: 0; }
+      #login .brand .logo { width: 128px; height: 128px; }
+      #login .login-form { width: min(400px, 100%); }
+      #app:not(.hidden) {
+        flex: 1;
+        min-height: 0;
+        height: auto;
+      }
+      #app.home .menus {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+      }
+      #app.home .menus button {
+        padding: 22px 12px;
+        font-size: 1.12rem;
+        height: auto;
+      }
+      .menus {
+        flex-direction: row;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      .menus button { flex: 1; }
+      .top { margin-bottom: 14px; }
+      .chart-scroll { overflow-x: hidden; }
+      .chart {
+        min-width: 0;
+        width: 100%;
+        height: 360px;
+      }
+      .chart.issues { height: 240px; }
+      .chart.compare { height: 400px; }
+      #present, #future {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) min(300px, 30%);
+        gap: 8px 36px;
+        align-items: start;
+      }
+      #present .brief-main, #future .brief-main { grid-column: 1; }
+      #present .alloc-box, #future .alloc-box {
+        grid-column: 2;
+        grid-row: 1;
+        position: sticky;
+        top: 0;
+        margin-top: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -164,6 +245,7 @@
         <img class="logo" src="logo.jpg" alt="Ted Investment"/>
         Ted Investment
       </div>
+      <div class="login-form">
       <label for="role">Qualification</label>
       <select id="role">
         <option value="Manager">Manager</option>
@@ -182,6 +264,7 @@
       <p class="hint" id="loginHint">매니저 계정은 어느 폰에서나 같은 ID·PW로 들어갑니다. User Add로 만든 계정은 쓰던 폰에서 보낸 링크를 이 폰에서 연 뒤 로그인하세요.</p>
       <button class="primary" id="loginBtn" type="button">Sign in</button>
       <button class="ghost" id="adminBtn" type="button">Information</button>
+      </div>
     </section>
 
     <section id="app" class="hidden">
@@ -442,18 +525,19 @@
     }
 
     function renderPresent(data) {
-      if (!data || typeof data === "string") return mdPara(data || "");
+      if (!data || typeof data === "string") return `<div class="brief-main">${mdPara(data || "")}</div>`;
       const rates = (data.rates || []).map(r => `<li>· ${r.label} : ${r.value}</li>`).join("");
       const paras = (data.paragraphs || []).map(mdPara).join("");
-      return `<p class="brief-title">${data.title || ""}</p>`
+      return `<div class="brief-main"><p class="brief-title">${data.title || ""}</p>`
         + (rates ? `<ul class="rate-list">${rates}</ul>` : "")
-        + paras;
+        + paras
+        + `</div>`;
     }
 
     function renderFuture(data) {
-      if (!data || typeof data === "string") return mdPara(data || "");
+      if (!data || typeof data === "string") return `<div class="brief-main">${mdPara(data || "")}</div>`;
       const paras = (data.paragraphs || []).map(mdPara).join("");
-      return `<p class="brief-title">${data.title || ""}</p>` + paras;
+      return `<div class="brief-main"><p class="brief-title">${data.title || ""}</p>` + paras + `</div>`;
     }
 
     function md(text) {
@@ -648,6 +732,20 @@
       if (name === "past") setTimeout(drawPast, 80);
     }
 
+    function resizePast() {
+      if ($("past").classList.contains("hidden")) return;
+      ["chartIssues","chartCompare","chartRates","chartKorea","chartNasdaq","chartGold","chartBtc"].forEach(id => {
+        const el = $(id);
+        if (el && el.data) Plotly.Plots.resize(el);
+      });
+    }
+    window.addEventListener("resize", resizePast);
+    if (window.matchMedia) {
+      window.matchMedia("(min-width: 960px)").addEventListener("change", () => {
+        if (!$("past").classList.contains("hidden")) setTimeout(drawPast, 80);
+      });
+    }
+
     function enter(role) {
       $("who").textContent = role;
       $("present").innerHTML = renderPresent(BOOT.present) + weightsHtml(BOOT.weights);
@@ -736,7 +834,7 @@
         show("login");
       }
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=3");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=4");
   </script>
 </body>
 </html>
