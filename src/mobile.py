@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from typing import Any
 
@@ -28,7 +29,7 @@ def _hash_account(role: str, user_id: str, pw: str) -> str:
     return hashlib.sha256(f"{role}|{user_id}|{pw}".encode("utf-8")).hexdigest()
 
 
-def _extra_user_records() -> list[dict[str, str]]:
+def _extra_user_records() -> list[dict[str, Any]]:
     path = ROOT / "data" / "ted_users.json"
     if not path.exists():
         return []
@@ -36,7 +37,7 @@ def _extra_user_records() -> list[dict[str, str]]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
-    rows: list[dict[str, str]] = []
+    rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for item in data if isinstance(data, list) else []:
         if not isinstance(item, dict):
@@ -49,7 +50,11 @@ def _extra_user_records() -> list[dict[str, str]]:
         if any(ch not in "0123456789abcdef" for ch in hashed):
             continue
         seen.add(key)
-        rows.append({"role": "User", "id": user_id, "hash": hashed})
+        row: dict[str, Any] = {"role": "User", "id": user_id, "hash": hashed}
+        updated = item.get("updated")
+        if isinstance(updated, (int, float)) and updated > 0:
+            row["updated"] = int(updated)
+        rows.append(row)
     return rows
 
 
@@ -132,12 +137,20 @@ def write_mobile_app(
 ) -> None:
     APP_DIR.mkdir(parents=True, exist_ok=True)
     seasonal = _seasonal_note(panel, str(report.get("asof"))) if panel is not None else {}
+    extra_users = _extra_user_records()
+    token = os.getenv("TED_SYNC_TOKEN", "").strip()
     boot = {
         "asof": report.get("asof"),
         "auth": [
-            {"role": a["role"], "id": a["id"], "hash": _hash_account(a["role"], a["id"], a["pw"])}
+            {
+                "role": a["role"],
+                "id": a["id"],
+                "hash": _hash_account(a["role"], a["id"], a["pw"]),
+                "source": "env",
+            }
             for a in ted_accounts()
-        ] + _extra_user_records(),
+        ]
+        + extra_users,
         "chart": _chart_bundle(panel) if panel is not None else {"dates": []},
         "events": _events_payload(),
         "present": present_briefing(report, channels),
@@ -149,8 +162,16 @@ def write_mobile_app(
         "__BOOT__", json.dumps(boot, ensure_ascii=False, default=str).replace("</", "<\\/")
     )
     (APP_DIR / "index.html").write_text(html, encoding="utf-8")
+    sync_js = APP_DIR / "sync.js"
+    if token:
+        sync_js.write_text(
+            "window.TED_SYNC_TOKEN = " + json.dumps(token) + ";\n",
+            encoding="utf-8",
+        )
+    elif sync_js.exists():
+        sync_js.unlink()
     (APP_DIR / "users.json").write_text(
-        json.dumps(_extra_user_records(), ensure_ascii=False, indent=2),
+        json.dumps(extra_users, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     (APP_DIR / "latest.json").write_text(

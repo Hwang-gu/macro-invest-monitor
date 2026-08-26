@@ -15,6 +15,7 @@ data/models/
 data/workbook/
 data/reports/*
 !data/reports/app/
+data/reports/app/sync.js
 !data/reports/latest.json
 *.parquet
 *.joblib
