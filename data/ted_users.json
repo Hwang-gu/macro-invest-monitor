@@ -1,19 +1,6 @@
 [
   {
     "role": "User",
-    "id": "gustjd9716@naver.com",
-    "hash": "8623adc0b04caa48cc800fcdd180e3088e565ed9df1b0c4839da7be88a5604bf",
-    "updated": 1787764872694,
-    "wrap": {
-      "v": 1,
-      "iter": 210000,
-      "salt": "rcQXDsTjYNso02YGmRCbtQ==",
-      "iv": "k4wVmtK7VfGUbrmh",
-      "ct": "lTaDDI4gsbkfxuhFLIGbW+4wIy1kQz/my/7eIoM8q8zsGkdVqWno7nbWSro0W3xmNCEz6KiEUVgCIOJIC5WLeZXTQBjj6KahHC4K6+ue9TtKfVqwu/sgiOlHem3onYFVkF3LX9wOMRGgzF5Ctw=="
-    }
-  },
-  {
-    "role": "User",
     "id": "leeyunjun2@naver.com",
     "hash": "4db48476912e04ea80adcf946610e1eb7891368757bd3cce3f6ee87491b023a4",
     "updated": 1787763154088
