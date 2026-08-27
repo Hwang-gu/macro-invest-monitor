@@ -430,7 +430,7 @@
       <label for="newUserPw">First Password</label>
       <div class="pw-wrap">
         <input id="newUserPw" type="password" autocomplete="new-password"/>
-        <button class="pw-toggle" type="button" data-for="newUserPw">보기</button>
+        <button class="pw-toggle eye" type="button" data-for="newUserPw" aria-label="보기"></button>
       </div>
       <div class="err" id="userErr"></div>
       <div class="ok" id="userOk"></div>
@@ -515,6 +515,11 @@
           ? CHART.dates[CHART.dates.length - 1] + "-28"
           : CHART.dates[CHART.dates.length - 1], 28)
       : toLocalNoon("2026-12-28", 28);
+    const VIEW_X0 = (() => {
+      const d = new Date(AXIS_X1.getTime());
+      d.setFullYear(d.getFullYear() - 1);
+      return d < AXIS_X0 ? AXIS_X0 : d;
+    })();
     BOOT.events = (BOOT.events || []).filter(ev => ymKey(ev.end || "") >= "2000-01").map(ev => Object.assign({}, ev, {
       start: ymKey(ev.start) < "2000-01" ? "2000-01-01" : ev.start
     }));
@@ -973,7 +978,7 @@
         type: "date",
         gridcolor: "#1c2a44", color: "#fff",
         autorange: false,
-        range: [AXIS_X0, AXIS_X1],
+        range: [VIEW_X0, AXIS_X1],
         minallowed: AXIS_X0,
         maxallowed: AXIS_X1,
         rangeslider: {
@@ -1035,7 +1040,7 @@
           type: "date",
           gridcolor: "#1c2a44", color: "#fff",
           autorange: false,
-          range: [AXIS_X0, AXIS_X1],
+          range: [VIEW_X0, AXIS_X1],
           minallowed: AXIS_X0,
           maxallowed: AXIS_X1
         },
@@ -1087,7 +1092,7 @@
       ["chartIssues","chartCompare","chartRates","chartKorea","chartNasdaq","chartGold","chartBtc"].forEach(id => {
         const el = $(id);
         if (!el || !el.layout) return;
-        const patch = {"xaxis.range": [AXIS_X0, AXIS_X1], "xaxis.autorange": false};
+        const patch = {"xaxis.range": [VIEW_X0, AXIS_X1], "xaxis.autorange": false};
         if (el.layout.xaxis && el.layout.xaxis.rangeslider && el.layout.xaxis.rangeslider.visible) {
           patch["xaxis.rangeslider.range"] = [AXIS_X0, AXIS_X1];
         }
@@ -1384,7 +1389,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=10");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=11");
   </script>
 </body>
 </html>
