@@ -44,6 +44,7 @@ UNIVERSE: tuple[Series, ...] = (
     Series("kosdaq", "코스닥", "asset", "yahoo", "^KQ11", note="한국 성장/중소형"),
     Series("nasdaq", "나스닥 종합", "asset", "yahoo", "^IXIC"),
     Series("sp500", "S&P 500", "asset", "yahoo", "^GSPC"),
+    Series("dow", "다우존스", "asset", "yahoo", "^DJI", note="Dow Jones Industrial Average"),
     Series("gold", "금 선물(근월)", "asset", "yahoo", "GC=F", note="금현물 대용"),
     Series("bitcoin", "비트코인", "asset", "yahoo", "BTC-USD", note="2014-09 이후"),
     Series("usdkkrw", "원/달러", "fx", "yahoo", "KRW=X", unit="krw_per_usd"),
@@ -74,6 +75,7 @@ FDR_FALLBACK = {
     "kosdaq": "KQ11",
     "nasdaq": "IXIC",
     "sp500": "US500",
+    "dow": "DJI",
     "usdkkrw": "USD/KRW",
     "bitcoin": "BTC/USD",
 }
