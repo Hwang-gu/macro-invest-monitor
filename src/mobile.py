@@ -125,20 +125,49 @@ def _extra_user_records() -> list[dict[str, Any]]:
     return rows
 
 
-def _monthly_values(series: pd.Series, ndigits: int) -> list[float | None]:
+def _daily_values(series: pd.Series, ndigits: int) -> list[float | None]:
     return [None if v != v else round(float(v), ndigits) for v in series]
 
 
+CHART_KEYS = (
+    "us_ffr",
+    "kr_call",
+    "us_3m",
+    "us_2y",
+    "us_10y",
+    "kr_10y",
+    "kospi",
+    "kosdaq",
+    "nasdaq",
+    "sp500",
+    "gold",
+    "bitcoin",
+)
+CHART_DIGITS = {
+    "us_ffr": 3,
+    "kr_call": 3,
+    "us_3m": 3,
+    "us_2y": 3,
+    "us_10y": 3,
+    "kr_10y": 3,
+    "kospi": 2,
+    "kosdaq": 2,
+    "nasdaq": 2,
+    "sp500": 2,
+    "gold": 2,
+    "bitcoin": 1,
+}
+
+
 def _chart_bundle(panel: pd.DataFrame) -> dict[str, Any]:
-    cols = [c for c in ["us_ffr", "kr_call", "kospi", "kosdaq", "nasdaq", "gold", "bitcoin"] if c in panel.columns]
-    monthly = panel[cols].resample("ME").last()
-    monthly = monthly[monthly.index >= pd.Timestamp(START)]
-    dates = [d.strftime("%Y-%m") for d in monthly.index]
+    cols = [c for c in CHART_KEYS if c in panel.columns]
+    daily = panel[cols].copy() if cols else panel.iloc[0:0].copy()
+    daily = daily[daily.index >= pd.Timestamp(START)]
+    dates = [d.strftime("%Y-%m-%d") for d in daily.index]
     bundle: dict[str, Any] = {"dates": dates}
-    digits = {"us_ffr": 3, "kr_call": 3, "kospi": 2, "kosdaq": 2, "nasdaq": 2, "gold": 2, "bitcoin": 1}
-    for key in ("us_ffr", "kr_call", "kospi", "kosdaq", "nasdaq", "gold", "bitcoin"):
-        if key in monthly:
-            bundle[key] = _monthly_values(monthly[key], digits[key])
+    for key in CHART_KEYS:
+        if key in daily:
+            bundle[key] = _daily_values(daily[key], CHART_DIGITS[key])
         else:
             bundle[key] = [None] * len(dates)
     return bundle

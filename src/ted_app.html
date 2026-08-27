@@ -165,6 +165,7 @@
       padding: 8px 0 6px;
       font-size: .95rem;
       letter-spacing: .06em;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
     }
     .chart-scroll {
       overflow-x: auto;
@@ -174,12 +175,12 @@
       padding-bottom: 4px;
     }
     .chart {
-      height: 300px; min-width: 920px; width: 220%;
-      touch-action: none;
+      height: 280px; min-width: 100%; width: 100%;
+      touch-action: pan-x pan-y;
     }
     .chart.issues { height: 210px; }
-    .chart.compare { height: 380px; }
-    .js-plotly-plot, .js-plotly-plot .plotly, .js-plotly-plot .main-svg { touch-action: none; }
+    .chart.compare { height: 400px; }
+    .js-plotly-plot, .js-plotly-plot .plotly, .js-plotly-plot .main-svg { touch-action: pan-x pan-y; }
     .legend {
       display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
       font-size: .78rem; color: #c5d0de; margin: 0 0 16px;
@@ -294,10 +295,8 @@
         letter-spacing: .1em;
       }
       .top { margin-bottom: 20px; }
-      .chart-scroll { overflow-x: hidden; }
+      .chart-scroll { overflow-x: auto; }
       .chart {
-        min-width: 0;
-        width: 100%;
         height: 360px;
       }
       .chart.issues { height: 240px; }
@@ -375,8 +374,8 @@
         <button type="button" data-tab="future">Future</button>
       </nav>
       <div id="past" class="panel hidden">
-        <p>월말 기준입니다. 한 손가락으로 좌우 이동, 두 손가락으로 확대·축소할 수 있습니다. 아래 막대를 좌우로 밀어도 됩니다.</p>
-        <p class="hint">추세 비교는 가격이 아니라, 각자 역사에서 상대적으로 높고 낮음(최저 0 · 최고 100)입니다. 금이 오를 때 코스피가 내리는지 같은 방향을 보려면 이 그래프와 범례 켜기/끄기를 쓰세요.</p>
+        <p>2000년 1월 1일부터 조회 시점까지 거래일 종가입니다. 처음에는 오늘이 오른쪽 끝에 있습니다. 더 과거는 그래프를 왼쪽으로 스크롤해 보세요.</p>
+        <p class="hint">종합 그래프는 금리·지수·달러 가격처럼 단위가 다른 값을 각자 역사의 최저=0, 최고=100으로 맞춰 상승·하락 방향만 비교합니다. 실제 수치는 아래 개별 그래프를 보세요.</p>
         <div class="legend">
           <span class="legend-item"><span class="dot" style="background:#e07070"></span>전쟁</span>
           <span class="legend-item"><span class="dot" style="background:#c090e0"></span>질병</span>
@@ -385,19 +384,34 @@
           <span class="legend-item"><span class="dot" style="background:#e0a050"></span>지정학</span>
           <span class="legend-item"><span class="dot" style="background:#5aa0ff"></span>정책</span>
         </div>
-        <h3 class="chart-title">Issue Timeline</h3>
+        <h3 class="chart-title">이슈 타임라인</h3>
         <div class="chart-scroll"><div class="chart issues" id="chartIssues"></div></div>
-        <h3 class="chart-title">Trend Comparison</h3>
+        <h3 class="chart-title">종합 추세 (0–100)</h3>
+        <div class="legend" id="compareLegend"></div>
         <div class="chart-scroll"><div class="chart compare" id="chartCompare"></div></div>
-        <h3 class="chart-title">Policy Rates</h3>
-        <div class="chart-scroll"><div class="chart" id="chartRates"></div></div>
-        <h3 class="chart-title">KOSPI · KOSDAQ</h3>
-        <div class="chart-scroll"><div class="chart" id="chartKorea"></div></div>
-        <h3 class="chart-title">NASDAQ</h3>
+        <h3 class="chart-title"><span class="dot" style="background:#22d3ee"></span>미국 기준금리</h3>
+        <div class="chart-scroll"><div class="chart" id="chartUsFfr"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#c084fc"></span>한국 기준금리</h3>
+        <div class="chart-scroll"><div class="chart" id="chartKrCall"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#2dd4bf"></span>미국 3개월 국채</h3>
+        <div class="chart-scroll"><div class="chart" id="chartUs3m"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#60a5fa"></span>미국 2년 국채</h3>
+        <div class="chart-scroll"><div class="chart" id="chartUs2y"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#818cf8"></span>미국 10년 국채</h3>
+        <div class="chart-scroll"><div class="chart" id="chartUs10y"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#e879f9"></span>한국 10년 국채</h3>
+        <div class="chart-scroll"><div class="chart" id="chartKr10y"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#4d9fff"></span>코스피</h3>
+        <div class="chart-scroll"><div class="chart" id="chartKospi"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#ef5b7a"></span>코스닥</h3>
+        <div class="chart-scroll"><div class="chart" id="chartKosdaq"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#34d399"></span>나스닥</h3>
         <div class="chart-scroll"><div class="chart" id="chartNasdaq"></div></div>
-        <h3 class="chart-title">Gold</h3>
+        <h3 class="chart-title"><span class="dot" style="background:#fb923c"></span>S&amp;P 500</h3>
+        <div class="chart-scroll"><div class="chart" id="chartSp500"></div></div>
+        <h3 class="chart-title"><span class="dot" style="background:#f5d76e"></span>금</h3>
         <div class="chart-scroll"><div class="chart" id="chartGold"></div></div>
-        <h3 class="chart-title">Bitcoin</h3>
+        <h3 class="chart-title"><span class="dot" style="background:#c4783a"></span>비트코인</h3>
         <div class="chart-scroll"><div class="chart" id="chartBtc"></div></div>
       </div>
       <div id="present" class="panel hidden">
@@ -512,18 +526,11 @@
       return out;
     }
     const CHART = clipChart(BOOT.chart || { dates: [] });
-    const CHART_XS = (CHART.dates || []).map(d => toLocalNoon(d, 15));
+    const CHART_XS = (CHART.dates || []).map(d => toLocalNoon(d, 1));
     const AXIS_X0 = toLocalNoon("2000-01-01", 1);
     const AXIS_X1 = CHART.dates.length
-      ? toLocalNoon(String(CHART.dates[CHART.dates.length - 1]).length === 7
-          ? CHART.dates[CHART.dates.length - 1] + "-28"
-          : CHART.dates[CHART.dates.length - 1], 28)
-      : toLocalNoon("2026-12-28", 28);
-    const VIEW_X0 = (() => {
-      const d = new Date(AXIS_X1.getTime());
-      d.setFullYear(d.getFullYear() - 10);
-      return d < AXIS_X0 ? AXIS_X0 : d;
-    })();
+      ? toLocalNoon(CHART.dates[CHART.dates.length - 1], 1)
+      : toLocalNoon("2026-08-27", 1);
     BOOT.events = (BOOT.events || []).filter(ev => ymKey(ev.end || "") >= "2000-01").map(ev => Object.assign({}, ev, {
       start: ymKey(ev.start) < "2000-01" ? "2000-01-01" : ev.start
     }));
@@ -916,31 +923,75 @@
     const LANES = ["war", "disease", "technology", "financial_crisis", "geopolitics", "policy"];
     const LANE_KO = {war:"전쟁", disease:"질병", technology:"신기술", financial_crisis:"위기", geopolitics:"지정학", policy:"정책"};
     const COLOR = {
-      kospi: "#7eb6ff",
-      kosdaq: "#e07070",
-      nasdaq: "#3dcc7a",
-      gold: "#e2c36b",
-      bitcoin: "#c4783a",
-      us_ffr: "#9ad0ff",
-      kr_call: "#d080ff"
+      us_ffr: "#22d3ee",
+      kr_call: "#c084fc",
+      us_3m: "#2dd4bf",
+      us_2y: "#60a5fa",
+      us_10y: "#818cf8",
+      kr_10y: "#e879f9",
+      kospi: "#4d9fff",
+      kosdaq: "#ef5b7a",
+      nasdaq: "#34d399",
+      sp500: "#fb923c",
+      gold: "#f5d76e",
+      bitcoin: "#c4783a"
     };
     const COMPARE = [
+      {key: "us_ffr", name: "미국 기준금리", color: COLOR.us_ffr},
+      {key: "kr_call", name: "한국 기준금리", color: COLOR.kr_call},
+      {key: "us_3m", name: "미국 3개월 국채", color: COLOR.us_3m},
+      {key: "us_2y", name: "미국 2년 국채", color: COLOR.us_2y},
+      {key: "us_10y", name: "미국 10년 국채", color: COLOR.us_10y},
+      {key: "kr_10y", name: "한국 10년 국채", color: COLOR.kr_10y},
       {key: "kospi", name: "코스피", color: COLOR.kospi},
       {key: "kosdaq", name: "코스닥", color: COLOR.kosdaq},
       {key: "nasdaq", name: "나스닥", color: COLOR.nasdaq},
+      {key: "sp500", name: "S&P 500", color: COLOR.sp500},
       {key: "gold", name: "금", color: COLOR.gold},
-      {key: "bitcoin", name: "비트코인", color: COLOR.bitcoin},
-      {key: "us_ffr", name: "미국 기준금리", color: COLOR.us_ffr},
-      {key: "kr_call", name: "한국 기준금리", color: COLOR.kr_call}
+      {key: "bitcoin", name: "비트코인", color: COLOR.bitcoin}
     ];
+    const SOLO = [
+      {id: "chartUsFfr", key: "us_ffr", name: "미국 기준금리", color: COLOR.us_ffr, y: "%"},
+      {id: "chartKrCall", key: "kr_call", name: "한국 기준금리", color: COLOR.kr_call, y: "%"},
+      {id: "chartUs3m", key: "us_3m", name: "미국 3개월 국채", color: COLOR.us_3m, y: "%"},
+      {id: "chartUs2y", key: "us_2y", name: "미국 2년 국채", color: COLOR.us_2y, y: "%"},
+      {id: "chartUs10y", key: "us_10y", name: "미국 10년 국채", color: COLOR.us_10y, y: "%"},
+      {id: "chartKr10y", key: "kr_10y", name: "한국 10년 국채", color: COLOR.kr_10y, y: "%"},
+      {id: "chartKospi", key: "kospi", name: "코스피", color: COLOR.kospi, y: "종가"},
+      {id: "chartKosdaq", key: "kosdaq", name: "코스닥", color: COLOR.kosdaq, y: "종가"},
+      {id: "chartNasdaq", key: "nasdaq", name: "나스닥", color: COLOR.nasdaq, y: "종가"},
+      {id: "chartSp500", key: "sp500", name: "S&P 500", color: COLOR.sp500, y: "종가"},
+      {id: "chartGold", key: "gold", name: "금", color: COLOR.gold, y: "USD"},
+      {id: "chartBtc", key: "bitcoin", name: "비트코인", color: COLOR.bitcoin, y: "USD"}
+    ];
+    const PAST_IDS = ["chartIssues", "chartCompare"].concat(SOLO.map(s => s.id));
     const PLOT_CFG = {
-      responsive: true,
+      responsive: false,
       displaylogo: false,
-      scrollZoom: true,
-      displayModeBar: true,
-      doubleClick: "reset",
-      modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"]
+      scrollZoom: false,
+      displayModeBar: false,
+      staticPlot: false
     };
+
+    function chartPixelWidth() {
+      const n = Math.max(CHART.dates.length, 1);
+      const wrap = document.querySelector("#past .chart-scroll");
+      const vw = wrap && wrap.clientWidth ? wrap.clientWidth : 360;
+      return Math.max(vw, Math.round(n * 2.4));
+    }
+    function sizePastCharts() {
+      const w = chartPixelWidth() + "px";
+      PAST_IDS.forEach(id => {
+        const el = $(id);
+        if (el) el.style.width = w;
+      });
+    }
+    function pinChartsRight() {
+      PAST_IDS.forEach(id => {
+        const wrap = $(id) && $(id).parentElement;
+        if (wrap) wrap.scrollLeft = wrap.scrollWidth;
+      });
+    }
 
     function scale01(arr) {
       const vals = arr.filter(v => v != null && v === v);
@@ -978,51 +1029,22 @@
     }
 
     function chartLayout(yaxis, extra) {
-      const xaxis = {
-        type: "date",
-        gridcolor: "#1c2a44", color: "#fff",
-        autorange: false,
-        range: [VIEW_X0, AXIS_X1],
-        minallowed: AXIS_X0,
-        maxallowed: AXIS_X1,
-        rangeslider: {
-          visible: true,
-          bgcolor: "#10192b",
-          thickness: 0.14,
-          autorange: false,
-          range: [AXIS_X0, AXIS_X1]
-        },
-        rangeselector: {
-          bgcolor: "#10192b",
-          activecolor: "#1e4d8c",
-          font: {color: "#fff", size: 10},
-          x: 0, y: 1.16,
-          buttons: [
-            {count: 1, label: "1Y", step: "year", stepmode: "backward"},
-            {count: 5, label: "5Y", step: "year", stepmode: "backward"},
-            {count: 10, label: "10Y", step: "year", stepmode: "backward"},
-            {step: "all", label: "All"}
-          ]
-        }
-      };
       return Object.assign({
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
         font: {color: "#fff", family: "Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
-        margin: {l: 46, r: 16, t: 48, b: 72},
-        legend: {
-          orientation: "h",
-          y: -0.28,
-          x: 0,
-          font: {size: 12, color: "#fff", family: "Arial, Chosunilbo Myeongjo, sans-serif"},
-          bgcolor: "rgba(11,18,32,.92)",
-          itemwidth: 36,
-          itemsizing: "constant",
-          tracegroupgap: 10
-        },
+        margin: {l: 48, r: 18, t: 28, b: 40},
+        showlegend: false,
         hovermode: "x unified",
-        dragmode: "pan",
-        xaxis,
-        yaxis: Object.assign({gridcolor: "#1c2a44", color: "#fff", fixedrange: false}, yaxis || {}),
+        dragmode: false,
+        xaxis: {
+          type: "date",
+          gridcolor: "#1c2a44", color: "#fff",
+          autorange: false,
+          range: [AXIS_X0, AXIS_X1],
+          rangeslider: {visible: false},
+          fixedrange: true
+        },
+        yaxis: Object.assign({gridcolor: "#1c2a44", color: "#fff", fixedrange: true}, yaxis || {}),
         shapes: issueShapes(),
         autosize: true
       }, extra || {});
@@ -1046,16 +1068,17 @@
       Plotly.newPlot("chartIssues", traces, {
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
         font: {color: "#fff", family: "Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
-        margin: {l: 58, r: 16, t: 40, b: 40},
-        dragmode: "pan",
+        margin: {l: 58, r: 18, t: 16, b: 40},
+        dragmode: false,
         hovermode: "closest",
+        showlegend: false,
         xaxis: {
           type: "date",
           gridcolor: "#1c2a44", color: "#fff",
           autorange: false,
-          range: [VIEW_X0, AXIS_X1],
-          minallowed: AXIS_X0,
-          maxallowed: AXIS_X1
+          range: [AXIS_X0, AXIS_X1],
+          rangeslider: {visible: false},
+          fixedrange: true
         },
         yaxis: {
           gridcolor: "#1c2a44", color: "#fff",
@@ -1068,48 +1091,69 @@
       }, PLOT_CFG);
     }
 
+    let pastDrawn = false;
     function drawPast() {
       const c = CHART;
+      sizePastCharts();
+      if (pastDrawn) {
+        requestAnimationFrame(() => {
+          PAST_IDS.forEach(id => {
+            const el = $(id);
+            if (el && el.data) Plotly.Plots.resize(el);
+          });
+          pinChartsRight();
+        });
+        return;
+      }
+      pastDrawn = true;
       drawIssues();
+      $("compareLegend").innerHTML = COMPARE.map(s =>
+        `<span class="legend-item"><span class="dot" style="background:${s.color}"></span>${s.name}</span>`
+      ).join("");
       const compare = COMPARE.map(s => ({
         x: CHART_XS,
         y: scale01(c[s.key] || []),
         name: s.name,
         type: "scatter",
         mode: "lines",
-        line: {color: s.color, width: 1.8}
+        line: {color: s.color, width: 1.7},
+        connectgaps: false,
+        hovertemplate: "%{fullData.name}: %{y:.1f}<extra></extra>"
       })).concat(issueHover(100));
-      Plotly.newPlot("chartCompare", compare, chartLayout({title: "Relative", range: [-2, 108]}), PLOT_CFG);
-
-      Plotly.newPlot("chartRates", [
-        {x: CHART_XS, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: COLOR.us_ffr, width: 1.8}},
-        {x: CHART_XS, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: COLOR.kr_call, width: 1.8}}
-      ].concat(issueHover(6)), chartLayout({title: "%"}), PLOT_CFG);
-
-      Plotly.newPlot("chartKorea", [
-        {x: CHART_XS, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: COLOR.kospi, width: 1.8}},
-        {x: CHART_XS, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: COLOR.kosdaq, width: 1.8}}
-      ], chartLayout({title: "Close"}), PLOT_CFG);
-
-      Plotly.newPlot("chartNasdaq", [
-        {x: CHART_XS, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: COLOR.nasdaq, width: 1.8}}
-      ], chartLayout({title: "Close"}), PLOT_CFG);
-
-      Plotly.newPlot("chartGold", [
-        {x: CHART_XS, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: COLOR.gold, width: 1.8}}
-      ], chartLayout({title: "USD"}), PLOT_CFG);
-
-      Plotly.newPlot("chartBtc", [
-        {x: CHART_XS, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: COLOR.bitcoin, width: 1.8}}
-      ], chartLayout({title: "USD"}), PLOT_CFG);
-      ["chartIssues","chartCompare","chartRates","chartKorea","chartNasdaq","chartGold","chartBtc"].forEach(id => {
+      Plotly.newPlot("chartCompare", compare, chartLayout({title: "상대 0–100", range: [-2, 108]}), PLOT_CFG);
+      function pinOne(id) {
         const el = $(id);
-        if (!el || !el.layout) return;
-        const patch = {"xaxis.range": [VIEW_X0, AXIS_X1], "xaxis.autorange": false};
-        if (el.layout.xaxis && el.layout.xaxis.rangeslider && el.layout.xaxis.rangeslider.visible) {
-          patch["xaxis.rangeslider.range"] = [AXIS_X0, AXIS_X1];
-        }
-        Plotly.relayout(el, patch);
+        if (el && el.data) Plotly.Plots.resize(el);
+        const wrap = el && el.parentElement;
+        if (wrap) wrap.scrollLeft = wrap.scrollWidth;
+      }
+      pinOne("chartIssues");
+      pinOne("chartCompare");
+      requestAnimationFrame(() => {
+        pinOne("chartIssues");
+        pinOne("chartCompare");
+      });
+      SOLO.forEach(s => {
+        const make = () => {
+          Plotly.newPlot(s.id, [{
+            x: CHART_XS,
+            y: c[s.key] || [],
+            name: s.name,
+            type: "scatter",
+            mode: "lines",
+            line: {color: s.color, width: 1.7},
+            connectgaps: false,
+            hovertemplate: "%{fullData.name}: %{y}<extra></extra>"
+          }], chartLayout({title: s.y}), PLOT_CFG);
+          pinOne(s.id);
+        };
+        if (!("IntersectionObserver" in window)) { make(); return; }
+        const io = new IntersectionObserver(ents => {
+          if (!ents.some(e => e.isIntersecting)) return;
+          io.disconnect();
+          make();
+        }, {rootMargin: "280px"});
+        io.observe($(s.id));
       });
     }
 
@@ -1200,10 +1244,12 @@
 
     function resizePast() {
       if ($("past").classList.contains("hidden")) return;
-      ["chartIssues","chartCompare","chartRates","chartKorea","chartNasdaq","chartGold","chartBtc"].forEach(id => {
+      sizePastCharts();
+      PAST_IDS.forEach(id => {
         const el = $(id);
         if (el && el.data) Plotly.Plots.resize(el);
       });
+      pinChartsRight();
     }
     window.addEventListener("resize", resizePast);
     if (window.matchMedia) {
@@ -1402,7 +1448,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=12");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=14");
   </script>
 </body>
 </html>
