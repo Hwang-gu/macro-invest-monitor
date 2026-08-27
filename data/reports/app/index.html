@@ -163,40 +163,40 @@
       text-align: left;
       position: sticky; top: 0; z-index: 3;
       background: #0b1220;
-      padding: 10px 2px 4px;
-      font-size: .92rem;
+      padding: 8px 2px 2px;
+      font-size: .88rem;
       letter-spacing: .04em;
       display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
     }
-    .tv-last { font-size: .88rem; color: #9ad0ff; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+    .tv-last { font-size: .82rem; color: #9ad0ff; letter-spacing: 0; font-variant-numeric: tabular-nums; }
     .tv-readout {
-      font-size: .75rem; color: #b7c3d4; min-height: 1.15em;
-      margin: 0 2px 6px; font-variant-numeric: tabular-nums;
+      font-size: .72rem; color: #b7c3d4; min-height: 1.05em;
+      margin: 0 2px 4px; font-variant-numeric: tabular-nums;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .period-bar {
-      display: flex; gap: 6px; margin: 4px 0 14px;
+      display: flex; gap: 4px; margin: 2px 0 10px;
       overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
     .period-bar button {
-      width: auto; flex: 0 0 auto; margin: 0; padding: 6px 11px;
-      font-size: .78rem; letter-spacing: 0; border-radius: 8px;
+      width: auto; flex: 0 0 auto; margin: 0; padding: 5px 9px;
+      font-size: .74rem; letter-spacing: 0; border-radius: 7px;
     }
     .period-bar button.on { background: #1e4d8c; border-color: #6ea2e6; }
     .chart-scroll {
       overflow: hidden;
-      margin: 0 0 20px;
+      margin: 0 0 12px;
       border: 1px solid #1c2a44;
-      border-radius: 10px;
+      border-radius: 8px;
       background: #0d1524;
     }
     .chart {
-      height: 260px; min-width: 0; width: 100%;
+      height: 168px; min-width: 0; width: 100%;
       touch-action: none;
     }
-    .chart.issues { height: 200px; }
-    .chart.compare { height: 300px; }
-    .chart.group { height: 280px; }
+    .chart.issues { height: 120px; }
+    .chart.compare { height: 188px; }
+    .chart.group { height: 168px; }
     .js-plotly-plot, .js-plotly-plot .plotly, .js-plotly-plot .main-svg { touch-action: none; }
     .legend {
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
@@ -314,10 +314,10 @@
       }
       .top { margin-bottom: 20px; }
       .chart-scroll { overflow: hidden; }
-      .chart { height: 340px; }
-      .chart.issues { height: 230px; }
-      .chart.compare { height: 380px; }
-      .chart.group { height: 360px; }
+      .chart { height: 200px; }
+      .chart.issues { height: 140px; }
+      .chart.compare { height: 220px; }
+      .chart.group { height: 200px; }
       #present { display: flex; flex-direction: column; }
       #presentBody, #future {
         display: grid;
@@ -391,7 +391,7 @@
         <button type="button" data-tab="future">Future</button>
       </nav>
       <div id="past" class="panel hidden">
-        <p>2000년 1월 1일부터 조회일까지입니다. 오른쪽 끝이 오늘이고, 증권사 차트처럼 좌우로 밀거나 확대·축소하면 됩니다.</p>
+        <p>2000년 1월부터 조회일까지입니다. KB증권 차트처럼 기간을 고르고, 좌우로 밀어 보시면 됩니다. 날짜는 가로축에 연·월만 남겼습니다.</p>
         <div class="period-bar" id="periodBar"></div>
         <div class="legend">
           <span class="legend-item"><span class="dot" style="background:#e07070"></span>전쟁</span>
@@ -973,20 +973,20 @@
     ];
     const PAST_IDS = ["chartIssues", "chartCompare", "chartRatesFx", "chartEquities", "chartGold", "chartBtc"];
     const PERIODS = [
-      {id: "1M", months: 1},
-      {id: "3M", months: 3},
-      {id: "6M", months: 6},
-      {id: "1Y", months: 12},
-      {id: "3Y", months: 36},
-      {id: "5Y", months: 60},
-      {id: "All", months: null}
+      {id: "1M", months: 1, label: "1개월"},
+      {id: "3M", months: 3, label: "3개월"},
+      {id: "6M", months: 6, label: "6개월"},
+      {id: "1Y", months: 12, label: "1년"},
+      {id: "3Y", months: 36, label: "3년"},
+      {id: "5Y", months: 60, label: "5년"},
+      {id: "All", months: null, label: "전체"}
     ];
     let currentPeriod = "1Y";
     const lwCharts = [];
     const PLOT_CFG = {
       responsive: true,
       displaylogo: false,
-      scrollZoom: true,
+      scrollZoom: false,
       displayModeBar: false
     };
 
@@ -1092,11 +1092,12 @@
         range: [toLocalNoon(r.from, 1), toLocalNoon(r.to, 1)],
         minallowed: AXIS_X0,
         maxallowed: AXIS_X1,
-        nticks: 6,
+        nticks: 3,
         tickformat: "%y.%m",
-        ticks: "outside",
-        tickfont: {size: 11, color: "#9aa8bc"},
+        ticks: "",
+        tickfont: {size: 10, color: "#8a97ab"},
         showticklabels: true,
+        showgrid: false,
         rangeslider: {visible: false},
         fixedrange: false
       };
@@ -1120,7 +1121,7 @@
       Plotly.newPlot("chartIssues", traces, {
         paper_bgcolor: "#0d1524", plot_bgcolor: "#0d1524",
         font: {color: "#fff", family: "Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
-        margin: {l: 48, r: 10, t: 8, b: 32},
+        margin: {l: 44, r: 8, t: 4, b: 20},
         dragmode: "pan",
         hovermode: "closest",
         showlegend: false,
@@ -1138,42 +1139,62 @@
     }
 
     function lwOptions(dual) {
+      const Type = (window.LightweightCharts && LightweightCharts.TickMarkType) || {};
       return {
         autoSize: true,
         layout: {
           background: {type: "solid", color: "#0d1524"},
-          textColor: "#9aa8bc",
+          textColor: "#8a97ab",
           fontFamily: "Arial, sans-serif",
-          fontSize: 11
+          fontSize: 10
         },
         grid: {
-          vertLines: {color: "rgba(28,42,68,.7)"},
-          horzLines: {color: "rgba(28,42,68,.7)"}
+          vertLines: {visible: false},
+          horzLines: {color: "rgba(28,42,68,.55)"}
         },
         rightPriceScale: {
           borderVisible: false,
-          scaleMargins: {top: 0.06, bottom: 0.08}
+          autoScale: true,
+          entireTextOnly: true,
+          ticksVisible: false,
+          scaleMargins: {top: 0.02, bottom: 0.02}
         },
         leftPriceScale: {
           visible: !!dual,
           borderVisible: false,
-          scaleMargins: {top: 0.06, bottom: 0.08}
+          autoScale: true,
+          entireTextOnly: true,
+          ticksVisible: false,
+          scaleMargins: {top: 0.02, bottom: 0.02}
         },
         timeScale: {
           borderVisible: false,
           timeVisible: false,
           secondsVisible: false,
-          rightOffset: 3,
-          minBarSpacing: 0.4,
-          tickMarkFormatter: time => {
-            let s = "";
-            if (typeof time === "string") s = time;
-            else if (time && time.year) s = time.year + "-" + String(time.month).padStart(2, "0");
-            else if (typeof time === "number") {
-              const d = new Date(time * 1000);
-              s = d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0");
+          ticksVisible: false,
+          rightOffset: 2,
+          minBarSpacing: 0.6,
+          fixRightEdge: true,
+          lockVisibleTimeRangeOnResize: true,
+          tickMarkFormatter: (time, tickMarkType) => {
+            if (tickMarkType === Type.DayOfMonth || tickMarkType === Type.Time || tickMarkType === Type.TimeWithSeconds || tickMarkType === 2 || tickMarkType === 3 || tickMarkType === 4) {
+              return "";
             }
-            return s.length >= 7 ? s.slice(2, 7).replace("-", ".") : s;
+            let year = 0, month = 0;
+            if (typeof time === "string" && time.length >= 7) {
+              year = Number(time.slice(0, 4));
+              month = Number(time.slice(5, 7));
+            } else if (time && time.year) {
+              year = time.year;
+              month = time.month;
+            } else if (typeof time === "number") {
+              const d = new Date(time * 1000);
+              year = d.getUTCFullYear();
+              month = d.getUTCMonth() + 1;
+            }
+            if (!year) return "";
+            if (tickMarkType === Type.Year || tickMarkType === 0) return String(year).slice(2);
+            return String(year).slice(2) + "." + String(month).padStart(2, "0");
           }
         },
         crosshair: {
@@ -1181,14 +1202,23 @@
           vertLine: {color: "#6ea2e6", width: 1, style: 2, labelBackgroundColor: "#1e4d8c"},
           horzLine: {color: "#6ea2e6", width: 1, style: 2, labelBackgroundColor: "#1e4d8c"}
         },
-        handleScroll: {mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false},
-        handleScale: {axisPressedMouseMove: true, pinch: true, mouseWheel: true}
+        handleScroll: {mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false},
+        handleScale: {
+          mouseWheel: false,
+          pinch: true,
+          axisPressedMouseMove: {time: true, price: false},
+          axisDoubleClickReset: {time: true, price: true}
+        }
       };
     }
 
     function applyVisibleRange(chart) {
       const r = visibleRange(currentPeriod);
-      try { chart.timeScale().setVisibleRange(r); } catch (e) {}
+      try {
+        chart.timeScale().setVisibleRange(r);
+        chart.priceScale("right").applyOptions({autoScale: true});
+        chart.priceScale("left").applyOptions({autoScale: true});
+      } catch (e) {}
     }
 
     function mountLineChart(id, specs, opts) {
@@ -1237,7 +1267,7 @@
     function wirePeriods() {
       const bar = $("periodBar");
       bar.innerHTML = PERIODS.map(p =>
-        `<button type="button" data-p="${p.id}" class="${p.id === currentPeriod ? "on" : ""}">${p.id}</button>`
+        `<button type="button" data-p="${p.id}" class="${p.id === currentPeriod ? "on" : ""}">${p.label}</button>`
       ).join("");
       bar.onclick = e => {
         const btn = e.target.closest("button");
@@ -1573,7 +1603,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=16");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=17");
   </script>
 </body>
 </html>
