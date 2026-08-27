@@ -178,10 +178,14 @@
       touch-action: none;
     }
     .chart.issues { height: 210px; }
-    .chart.compare { height: 340px; }
+    .chart.compare { height: 380px; }
     .js-plotly-plot, .js-plotly-plot .plotly, .js-plotly-plot .main-svg { touch-action: none; }
-    .legend { font-size: .78rem; color: #c5d0de; margin: -6px 0 16px; }
-    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px 0 8px; }
+    .legend {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+      font-size: .78rem; color: #c5d0de; margin: 0 0 16px;
+    }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
     .modal-bg {
       position: fixed; inset: 0; background: rgba(0,0,0,.55);
       display: flex; align-items: center; justify-content: center; padding: 20px;
@@ -297,7 +301,7 @@
         height: 360px;
       }
       .chart.issues { height: 240px; }
-      .chart.compare { height: 400px; }
+      .chart.compare { height: 440px; }
       #present { display: flex; flex-direction: column; }
       #presentBody, #future {
         display: grid;
@@ -374,12 +378,12 @@
         <p>월말 기준입니다. 한 손가락으로 좌우 이동, 두 손가락으로 확대·축소할 수 있습니다. 아래 막대를 좌우로 밀어도 됩니다.</p>
         <p class="hint">추세 비교는 가격이 아니라, 각자 역사에서 상대적으로 높고 낮음(최저 0 · 최고 100)입니다. 금이 오를 때 코스피가 내리는지 같은 방향을 보려면 이 그래프와 범례 켜기/끄기를 쓰세요.</p>
         <div class="legend">
-          <span class="dot" style="background:#e07070"></span>전쟁
-          <span class="dot" style="background:#c090e0"></span>질병
-          <span class="dot" style="background:#3dcc7a"></span>신기술
-          <span class="dot" style="background:#c8c8c8"></span>위기
-          <span class="dot" style="background:#e0a050"></span>지정학
-          <span class="dot" style="background:#5aa0ff"></span>정책
+          <span class="legend-item"><span class="dot" style="background:#e07070"></span>전쟁</span>
+          <span class="legend-item"><span class="dot" style="background:#c090e0"></span>질병</span>
+          <span class="legend-item"><span class="dot" style="background:#3dcc7a"></span>신기술</span>
+          <span class="legend-item"><span class="dot" style="background:#c8c8c8"></span>위기</span>
+          <span class="legend-item"><span class="dot" style="background:#e0a050"></span>지정학</span>
+          <span class="legend-item"><span class="dot" style="background:#5aa0ff"></span>정책</span>
         </div>
         <h3 class="chart-title">Issue Timeline</h3>
         <div class="chart-scroll"><div class="chart issues" id="chartIssues"></div></div>
@@ -517,7 +521,7 @@
       : toLocalNoon("2026-12-28", 28);
     const VIEW_X0 = (() => {
       const d = new Date(AXIS_X1.getTime());
-      d.setFullYear(d.getFullYear() - 1);
+      d.setFullYear(d.getFullYear() - 10);
       return d < AXIS_X0 ? AXIS_X0 : d;
     })();
     BOOT.events = (BOOT.events || []).filter(ev => ymKey(ev.end || "") >= "2000-01").map(ev => Object.assign({}, ev, {
@@ -912,13 +916,13 @@
     const LANES = ["war", "disease", "technology", "financial_crisis", "geopolitics", "policy"];
     const LANE_KO = {war:"전쟁", disease:"질병", technology:"신기술", financial_crisis:"위기", geopolitics:"지정학", policy:"정책"};
     const COLOR = {
-      kospi: "#3b82ff",
-      kosdaq: "#ff3d7a",
-      nasdaq: "#22d67a",
-      gold: "#ffcc00",
-      bitcoin: "#ff6b00",
-      us_ffr: "#00e5ff",
-      kr_call: "#c084fc"
+      kospi: "#7eb6ff",
+      kosdaq: "#e07070",
+      nasdaq: "#3dcc7a",
+      gold: "#e2c36b",
+      bitcoin: "#c4783a",
+      us_ffr: "#9ad0ff",
+      kr_call: "#d080ff"
     };
     const COMPARE = [
       {key: "kospi", name: "코스피", color: COLOR.kospi},
@@ -1004,8 +1008,17 @@
       return Object.assign({
         paper_bgcolor: "#0b1220", plot_bgcolor: "#0b1220",
         font: {color: "#fff", family: "Arial, Chosunilbo Myeongjo, sans-serif", size: 11},
-        margin: {l: 46, r: 16, t: 48, b: 16},
-        legend: {orientation: "h", y: -0.42, font: {size: 10}},
+        margin: {l: 46, r: 16, t: 48, b: 72},
+        legend: {
+          orientation: "h",
+          y: -0.28,
+          x: 0,
+          font: {size: 12, color: "#fff", family: "Arial, Chosunilbo Myeongjo, sans-serif"},
+          bgcolor: "rgba(11,18,32,.92)",
+          itemwidth: 36,
+          itemsizing: "constant",
+          tracegroupgap: 10
+        },
         hovermode: "x unified",
         dragmode: "pan",
         xaxis,
@@ -1064,30 +1077,30 @@
         name: s.name,
         type: "scatter",
         mode: "lines",
-        line: {color: s.color, width: 2.2}
+        line: {color: s.color, width: 1.8}
       })).concat(issueHover(100));
       Plotly.newPlot("chartCompare", compare, chartLayout({title: "Relative", range: [-2, 108]}), PLOT_CFG);
 
       Plotly.newPlot("chartRates", [
-        {x: CHART_XS, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: COLOR.us_ffr, width: 2.2}},
-        {x: CHART_XS, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: COLOR.kr_call, width: 2.2}}
+        {x: CHART_XS, y: c.us_ffr, name: "미국 기준금리", type: "scatter", mode: "lines", line: {color: COLOR.us_ffr, width: 1.8}},
+        {x: CHART_XS, y: c.kr_call, name: "한국 기준금리", type: "scatter", mode: "lines", line: {color: COLOR.kr_call, width: 1.8}}
       ].concat(issueHover(6)), chartLayout({title: "%"}), PLOT_CFG);
 
       Plotly.newPlot("chartKorea", [
-        {x: CHART_XS, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: COLOR.kospi, width: 2.2}},
-        {x: CHART_XS, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: COLOR.kosdaq, width: 2.2}}
+        {x: CHART_XS, y: c.kospi, name: "코스피", type: "scatter", mode: "lines", line: {color: COLOR.kospi, width: 1.8}},
+        {x: CHART_XS, y: c.kosdaq, name: "코스닥", type: "scatter", mode: "lines", line: {color: COLOR.kosdaq, width: 1.8}}
       ], chartLayout({title: "Close"}), PLOT_CFG);
 
       Plotly.newPlot("chartNasdaq", [
-        {x: CHART_XS, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: COLOR.nasdaq, width: 2.2}}
+        {x: CHART_XS, y: c.nasdaq, name: "나스닥", type: "scatter", mode: "lines", line: {color: COLOR.nasdaq, width: 1.8}}
       ], chartLayout({title: "Close"}), PLOT_CFG);
 
       Plotly.newPlot("chartGold", [
-        {x: CHART_XS, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: COLOR.gold, width: 2.2}}
+        {x: CHART_XS, y: c.gold, name: "금", type: "scatter", mode: "lines", line: {color: COLOR.gold, width: 1.8}}
       ], chartLayout({title: "USD"}), PLOT_CFG);
 
       Plotly.newPlot("chartBtc", [
-        {x: CHART_XS, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: COLOR.bitcoin, width: 2.2}}
+        {x: CHART_XS, y: c.bitcoin, name: "비트코인", type: "scatter", mode: "lines", line: {color: COLOR.bitcoin, width: 1.8}}
       ], chartLayout({title: "USD"}), PLOT_CFG);
       ["chartIssues","chartCompare","chartRates","chartKorea","chartNasdaq","chartGold","chartBtc"].forEach(id => {
         const el = $(id);
@@ -1389,7 +1402,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=11");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=12");
   </script>
 </body>
 </html>
