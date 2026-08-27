@@ -79,6 +79,15 @@
     .ghost { background: transparent; margin-top: 10px; }
     .err { color: #ffb4b4; font-size: .85rem; min-height: 1.2em; margin-top: 8px; text-align: center; }
     .hidden { display: none !important; }
+    .check-row {
+      display: flex; align-items: center; gap: 10px;
+      margin: 14px 0 4px;
+    }
+    .check-row input[type="checkbox"] {
+      width: 18px; height: 18px; padding: 0; margin: 0;
+      accent-color: #6ea2e6;
+    }
+    .check-row label { margin: 0; }
     .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; gap: 10px; }
     .top small { color: #b7c3d4; font-size: .78rem; }
     .top-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
@@ -98,7 +107,33 @@
     .menus button.on { background: #1e4d8c; border-color: #6ea2e6; }
     .panel { line-height: 1.55; font-size: .95rem; }
     .panel p { margin: 0 0 12px; }
-    #present p, #future p { text-indent: 1.15em; }
+    #presentBody p, #future p { text-indent: 1.15em; }
+    .cal {
+      margin: 0 0 22px;
+      padding: 12px 10px 14px;
+      border: 1px solid #2d5a9a;
+      border-radius: 12px;
+      background: #10192b;
+    }
+    .cal-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px; gap: 8px;
+    }
+    .cal-head button {
+      width: auto; margin: 0; padding: 4px 12px; font-size: .9rem;
+    }
+    .cal-label { letter-spacing: .06em; font-size: .92rem; }
+    .cal-week, .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center;
+    }
+    .cal-week span { font-size: .72rem; color: #b7c3d4; padding: 4px 0; }
+    .cal-grid button {
+      width: 100%; margin: 0; padding: 8px 0; font-size: .82rem;
+      background: transparent; border-color: transparent;
+    }
+    .cal-grid button.has { border-color: #3a5478; }
+    .cal-grid button.on { background: #1e4d8c; border-color: #6ea2e6; }
+    .cal-grid button:disabled { opacity: .28; cursor: default; }
     .brief-title {
       text-align: center; text-indent: 0 !important;
       letter-spacing: .06em; margin-bottom: 16px !important;
@@ -174,6 +209,11 @@
       width: auto; margin: 0; padding: 4px 8px; font-size: .75rem;
       border: 0; background: transparent; color: #b7c3d4;
     }
+    .pw-toggle.eye {
+      width: 36px; height: 36px; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pw-toggle.eye svg { width: 20px; height: 20px; display: block; }
     .pw-toggle:hover { color: #fff; }
     .hint { color: #b7c3d4; font-size: .78rem; margin: 8px 0 12px; }
     .ok { color: #9ad0a8; font-size: .85rem; min-height: 1.2em; margin-top: 8px; text-align: center; }
@@ -258,14 +298,15 @@
       }
       .chart.issues { height: 240px; }
       .chart.compare { height: 400px; }
-      #present, #future {
+      #present { display: flex; flex-direction: column; }
+      #presentBody, #future {
         display: grid;
         grid-template-columns: minmax(0, 1fr) min(300px, 30%);
         gap: 8px 36px;
         align-items: start;
       }
-      #present .brief-main, #future .brief-main { grid-column: 1; }
-      #present .alloc-box, #future .alloc-box {
+      #presentBody .brief-main, #future .brief-main { grid-column: 1; }
+      #presentBody .alloc-box, #future .alloc-box {
         grid-column: 2;
         grid-row: 1;
         position: sticky;
@@ -293,7 +334,11 @@
       <label for="pw">PW</label>
       <div class="pw-wrap">
         <input id="pw" type="password" autocomplete="current-password"/>
-        <button class="pw-toggle" type="button" data-for="pw">보기</button>
+        <button class="pw-toggle eye" type="button" data-for="pw" aria-label="보기"></button>
+      </div>
+      <div class="check-row">
+        <input id="autoSign" type="checkbox"/>
+        <label for="autoSign">Auto sign in</label>
       </div>
       <div class="err" id="loginErr"></div>
       <div class="ok" id="loginOk"></div>
@@ -351,7 +396,20 @@
         <h3 class="chart-title">Bitcoin</h3>
         <div class="chart-scroll"><div class="chart" id="chartBtc"></div></div>
       </div>
-      <div id="present" class="panel hidden"></div>
+      <div id="present" class="panel hidden">
+        <div class="cal">
+          <div class="cal-head">
+            <button type="button" id="calPrev" aria-label="Previous month">‹</button>
+            <span class="cal-label" id="calLabel"></span>
+            <button type="button" id="calNext" aria-label="Next month">›</button>
+          </div>
+          <div class="cal-week">
+            <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+        <div id="presentBody"></div>
+      </div>
       <div id="future" class="panel hidden"></div>
     </section>
   </div>
@@ -408,6 +466,7 @@
     const BOOT = JSON.parse(document.getElementById("boot").textContent);
     const $ = (id) => document.getElementById(id);
     const EXTRA_KEY = "ted_extra_users";
+    const AUTO_KEY = "ted_auto_sign";
     const USERS_API = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/data/ted_users.json";
     const USERS_RAW = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ted_users.json";
     let sharedUsers = [];
@@ -415,6 +474,16 @@
     let pwTarget = null;
     let writeToken = "";
     const WRITE_KEY = "ted_write_token";
+    let presentDates = [...new Set((BOOT.presentDates || []).concat(BOOT.asof ? [String(BOOT.asof).slice(0, 10)] : []))].filter(Boolean).sort();
+    let calCursor = toMonth(BOOT.asof);
+    let selectedPresent = "";
+    const EYE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const EYE_OFF_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 104.2 4.2"/><path d="M9.9 5.1A11 11 0 0112 5c6.5 0 10 7 10 7a18 18 0 01-3.2 3.9"/><path d="M6.1 6.1C3.9 7.8 2 12 2 12a18 18 0 005.2 5.9"/><path d="M14.1 14.1A3 3 0 019.9 9.9"/></svg>';
+
+    function toMonth(value) {
+      const s = String(value || "").slice(0, 7);
+      return /^\d{4}-\d{2}$/.test(s) ? s : new Date().toISOString().slice(0, 7);
+    }
 
     function ymKey(v) {
       const s = String(v || "");
@@ -708,6 +777,16 @@
       else list.push(row);
       return saveUserStore(list);
     }
+    function autoRecord() {
+      try { return JSON.parse(localStorage.getItem(AUTO_KEY) || "null"); }
+      catch { return null; }
+    }
+    function saveAuto(role, id, hash) {
+      localStorage.setItem(AUTO_KEY, JSON.stringify({ role, id, hash }));
+    }
+    function clearAuto() {
+      localStorage.removeItem(AUTO_KEY);
+    }
     function renderUsers() {
       const store = userStore();
       const locked = envIds();
@@ -740,21 +819,30 @@
       $("app").classList.toggle("hidden", id !== "app");
     }
 
+    function setPwToggle(btn, showing) {
+      if (btn.classList.contains("eye")) {
+        btn.innerHTML = showing ? EYE_OFF_SVG : EYE_SVG;
+        btn.setAttribute("aria-label", showing ? "숨김" : "보기");
+      } else {
+        btn.textContent = showing ? "숨김" : "보기";
+      }
+    }
     function resetPwField(id) {
       const input = $(id);
       if (!input) return;
       input.value = "";
       input.type = "password";
-      document.querySelectorAll('.pw-toggle[data-for="' + id + '"]').forEach(b => { b.textContent = "보기"; });
+      document.querySelectorAll('.pw-toggle[data-for="' + id + '"]').forEach(b => setPwToggle(b, false));
     }
     function wirePwToggles() {
       document.querySelectorAll(".pw-toggle").forEach(btn => {
+        setPwToggle(btn, false);
         btn.onclick = () => {
           const input = $(btn.dataset.for);
           if (!input) return;
           const showPw = input.type === "password";
           input.type = showPw ? "text" : "password";
-          btn.textContent = showPw ? "숨김" : "보기";
+          setPwToggle(btn, showPw);
         };
       });
     }
@@ -1013,6 +1101,67 @@
       $("app").classList.add("home");
     }
 
+    async function loadPresentDates() {
+      try {
+        const res = await fetch("archive/dates.json", { cache: "no-store" });
+        if (!res.ok) return;
+        const extra = await res.json();
+        if (Array.isArray(extra)) presentDates = [...new Set(presentDates.concat(extra.map(String)))].sort();
+      } catch {}
+    }
+    function dateSet() {
+      return new Set(presentDates);
+    }
+    function shiftMonth(ym, delta) {
+      const [y, m] = ym.split("-").map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    }
+    function renderCal() {
+      const [y, m] = calCursor.split("-").map(Number);
+      $("calLabel").textContent = y + "." + String(m).padStart(2, "0");
+      const first = new Date(y, m - 1, 1);
+      const start = first.getDay();
+      const days = new Date(y, m, 0).getDate();
+      const have = dateSet();
+      const cells = [];
+      for (let i = 0; i < start; i++) cells.push("<span></span>");
+      for (let day = 1; day <= days; day++) {
+        const key = calCursor + "-" + String(day).padStart(2, "0");
+        const on = selectedPresent === key ? " on" : "";
+        const has = have.has(key);
+        cells.push(
+          `<button type="button" data-day="${key}" class="${has ? "has" : ""}${on}" ${has ? "" : "disabled"}>${day}</button>`
+        );
+      }
+      $("calGrid").innerHTML = cells.join("");
+      $("calGrid").querySelectorAll("button[data-day]").forEach(btn => {
+        btn.onclick = () => showPresentDate(btn.dataset.day);
+      });
+    }
+    function presentHtml(data, weights) {
+      return renderPresent(data) + weightsHtml(weights);
+    }
+    async function showPresentDate(day) {
+      selectedPresent = day;
+      renderCal();
+      if (day === String(BOOT.asof || "").slice(0, 10)) {
+        $("presentBody").innerHTML = presentHtml(BOOT.present, BOOT.weights);
+        return;
+      }
+      $("presentBody").innerHTML = "<p class='hint'>불러오는 중...</p>";
+      try {
+        const res = await fetch("archive/" + day + ".json", { cache: "no-store" });
+        if (!res.ok) throw new Error("missing");
+        const data = await res.json();
+        $("presentBody").innerHTML = presentHtml(data.present, data.weights);
+      } catch {
+        $("presentBody").innerHTML = "<p class='hint'>이 날짜의 리포트가 없습니다.</p>";
+      }
+    }
+    $("calPrev").onclick = () => { calCursor = shiftMonth(calCursor, -1); renderCal(); };
+    $("calNext").onclick = () => { calCursor = shiftMonth(calCursor, 1); renderCal(); };
+
     function openTab(name) {
       const btn = document.querySelector('.menus button[data-tab="' + name + '"]');
       if (btn && btn.classList.contains("on")) {
@@ -1023,6 +1172,12 @@
       ["past","present","future"].forEach(t => $(t).classList.toggle("hidden", t !== name));
       document.querySelectorAll(".menus button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
       if (name === "past") setTimeout(drawPast, 80);
+      if (name === "present") {
+        loadPresentDates().then(() => {
+          renderCal();
+          if (selectedPresent) showPresentDate(selectedPresent);
+        });
+      }
     }
 
     function resizePast() {
@@ -1042,11 +1197,14 @@
     function enter(role, id) {
       currentUser = { role, id };
       $("who").textContent = role;
-      $("present").innerHTML = renderPresent(BOOT.present) + weightsHtml(BOOT.weights);
       $("future").innerHTML = renderFuture(BOOT.future) + weightsHtml(BOOT.weights);
+      $("presentBody").innerHTML = "";
+      selectedPresent = "";
+      calCursor = toMonth(BOOT.asof);
+      renderCal();
       $("userAddBtn").classList.toggle("hidden", role !== "Manager");
       $("pwChangeBtn").classList.toggle("hidden", role !== "User");
-      if (role === "Manager") loadWriteToken();
+      loadWriteToken();
       show("app");
       showHome();
     }
@@ -1064,6 +1222,9 @@
       }
       $("loginErr").textContent = "";
       $("role").value = acc.role;
+      const h = await digest(acc.role + "|" + acc.id + "|" + pw);
+      if ($("autoSign").checked) saveAuto(acc.role, acc.id, h);
+      else clearAuto();
       if (acc.role === "Manager") {
         try { rememberWriteToken(await unlockSyncToken(pw)); }
         catch { loadWriteToken(); }
@@ -1122,6 +1283,8 @@
     $("logoutBtn").onclick = () => {
       currentUser = null;
       clearWriteToken();
+      clearAuto();
+      $("autoSign").checked = false;
       $("userModal").classList.add("hidden");
       $("pwModal").classList.add("hidden");
       show("login");
@@ -1158,6 +1321,13 @@
         return;
       }
       renderUsers();
+      if (currentUser && currentUser.role === "User" && String(currentUser.id).toLowerCase() === String(target.id).toLowerCase()) {
+        const h = await digest("User|" + target.id + "|" + pw);
+        const auto = autoRecord();
+        if (auto && auto.role === "User" && String(auto.id).toLowerCase() === String(target.id).toLowerCase()) {
+          saveAuto("User", target.id, h);
+        }
+      }
       if (!synced) {
         $("pwErr").textContent = "이 기기에는 바뀌었습니다. 다른 기기에도 쓰려면 매니저로 한 번 로그인해 주세요.";
         return;
@@ -1193,9 +1363,28 @@
       if (clean !== location.pathname + location.search + location.hash) history.replaceState({}, "", clean || url.pathname);
     } catch {}
 
-    try { localStorage.removeItem("ted_auto_sign"); } catch {}
-    refreshShared().finally(() => show("login"));
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=9");
+    try { localStorage.removeItem("ted_auto_sign_legacy"); } catch {}
+    refreshShared().finally(() => {
+      const saved = autoRecord();
+      const savedOk = saved && allAuth().some(a =>
+        a.role === saved.role
+        && String(a.id).toLowerCase() === String(saved.id).toLowerCase()
+        && a.hash === saved.hash
+      );
+      if (savedOk) {
+        $("autoSign").checked = true;
+        $("uid").value = saved.id || "";
+        $("role").value = saved.role || "User";
+        enter(saved.role, saved.id);
+        if (saved.role === "Manager" && currentWriteToken() && mutableUsers().length) {
+          saveUserStore(mutableUsers()).catch(() => {});
+        }
+        return;
+      }
+      if (saved && !savedOk) clearAuto();
+      show("login");
+    });
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=10");
   </script>
 </body>
 </html>

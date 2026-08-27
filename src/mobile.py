@@ -4,7 +4,9 @@ import base64
 import hashlib
 import json
 import os
+import re
 import shutil
+import subprocess
 from typing import Any
 
 import numpy as np
@@ -173,6 +175,79 @@ def _weights(scores: dict[str, float] | None) -> dict[str, float]:
     return {k: round(float(w / total), 4) for k, w in zip(keys, e)}
 
 
+_ASOF_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _asof_key(value: Any) -> str:
+    raw = str(value or "")[:10]
+    return raw if _ASOF_RE.match(raw) else ""
+
+
+def _archive_dir() -> Any:
+    path = APP_DIR / "archive"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _write_present_archive(asof: str, present: dict[str, Any], weights: dict[str, float]) -> None:
+    key = _asof_key(asof)
+    if not key:
+        return
+    payload = {"asof": key, "present": present, "weights": weights}
+    (_archive_dir() / f"{key}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
+
+
+def _archive_dates() -> list[str]:
+    dates = [
+        p.stem
+        for p in _archive_dir().glob("*.json")
+        if _ASOF_RE.match(p.stem)
+    ]
+    dates.sort()
+    (_archive_dir() / "dates.json").write_text(
+        json.dumps(dates, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return dates
+
+
+def _seed_archives_from_git() -> None:
+    try:
+        out = subprocess.check_output(
+            ["git", "log", "--pretty=format:%H", "--", "data/reports/latest.json"],
+            cwd=ROOT,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return
+    seen: set[str] = set()
+    archive = _archive_dir()
+    for sha in out.decode("ascii", errors="ignore").splitlines():
+        sha = sha.strip()
+        if not sha:
+            continue
+        try:
+            raw = subprocess.check_output(
+                ["git", "show", f"{sha}:data/reports/latest.json"],
+                cwd=ROOT,
+                timeout=20,
+            )
+            report = json.loads(raw.decode("utf-8"))
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        key = _asof_key(report.get("asof"))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        path = archive / f"{key}.json"
+        if path.exists():
+            continue
+        _write_present_archive(key, present_briefing(report), _weights(report.get("asset_scores")))
+
+
 def _seasonal_note(panel: pd.DataFrame, asof: str) -> dict[str, Any]:
     if "kosdaq" not in panel.columns:
         return {}
@@ -223,6 +298,9 @@ def write_mobile_app(
         "weights": _weights(report.get("asset_scores")),
         "disclaimer": report.get("disclaimer"),
     }
+    _seed_archives_from_git()
+    _write_present_archive(str(boot["asof"] or ""), boot["present"], boot["weights"])
+    boot["presentDates"] = _archive_dates()
     box = _sync_box_for_boot()
     if box:
         boot["syncBox"] = box
