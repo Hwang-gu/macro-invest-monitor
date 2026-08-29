@@ -17,5 +17,18 @@
     "id": "leeyunjun2@naver.com",
     "hash": "4db48476912e04ea80adcf946610e1eb7891368757bd3cce3f6ee87491b023a4",
     "updated": 1787763154088
+  },
+  {
+    "role": "User",
+    "id": "lys020617@naver.com",
+    "hash": "e7da5fb7c28e687e35935854697e7dce1f50070dc8f5f5ae251eca78de05bb04",
+    "updated": 1787971626626,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "dVXlwJE7BcaMJJbhiNb05w==",
+      "iv": "QSguwPQGfyqN1ASu",
+      "ct": "IDf+p8lg6ktm1c6ArSwhWRbYn/xhJGvb5F0ISg0Rirqa8N0ClQ7rVy2yH90kLce56CBoA7R17wcu2USqNQ5jQtuW9PmwJojVHzsXWZnReMp642IjSSMSaP0u9Y0avZIdYUIhunSEkz70ikJQXQ=="
+    }
   }
 ]
