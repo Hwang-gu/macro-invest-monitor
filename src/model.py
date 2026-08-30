@@ -14,6 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from .config import (
     ASSET_KEYS,
     FORWARD_DAYS,
+    FUTURE_HORIZONS,
     MARKET_KEYS,
     MIN_HISTORY_DAYS,
     MODELS_DIR,
@@ -53,14 +54,31 @@ def _forward_return(price: pd.Series, days: int = FORWARD_DAYS) -> pd.Series:
     return price.shift(-days) / price - 1.0
 
 
-def train_models(panel: pd.DataFrame, features: pd.DataFrame) -> dict[str, Any]:
-    x = _feature_matrix(features)
-    targets = [k for k in list(ASSET_KEYS) + list(MARKET_KEYS) + list(SECTOR_KEYS) if k in panel.columns]
+def _horizon_label(days: int) -> str:
+    for _hid, n, label in FUTURE_HORIZONS:
+        if n == days:
+            return label
+    return f"{days}거래일"
+
+
+def _mom_col(key: str, days: int) -> str:
+    if days >= 126:
+        return f"{key}_mom_126"
+    if days >= 63:
+        return f"{key}_mom_63"
+    return f"{key}_mom_21"
+
+
+def _train_one_horizon(
+    x: pd.DataFrame,
+    panel: pd.DataFrame,
+    targets: list[str],
+    days: int,
+) -> tuple[dict[str, Pipeline], dict[str, dict[str, float]]]:
     models: dict[str, Pipeline] = {}
     metrics: dict[str, dict[str, float]] = {}
-
     for key in targets:
-        y = _forward_return(panel[key])
+        y = _forward_return(panel[key], days)
         df = pd.concat([x, y.rename("y")], axis=1).dropna()
         if len(df) < MIN_HISTORY_DAYS:
             continue
@@ -85,13 +103,43 @@ def train_models(panel: pd.DataFrame, features: pd.DataFrame) -> dict[str, Any]:
             "test_mean_pred": float(np.mean(pred)),
             "test_mean_actual": float(y_test.mean()),
         }
+    return models, metrics
 
-    payload = {"models": models, "metrics": metrics, "features": list(x.columns)}
+
+def train_models(panel: pd.DataFrame, features: pd.DataFrame) -> dict[str, Any]:
+    x = _feature_matrix(features)
+    targets = [k for k in list(ASSET_KEYS) + list(MARKET_KEYS) + list(SECTOR_KEYS) if k in panel.columns]
+    by_horizon: dict[str, dict[str, Any]] = {}
+    for _hid, days, _label in FUTURE_HORIZONS:
+        models, metrics = _train_one_horizon(x, panel, targets, days)
+        by_horizon[str(days)] = {"models": models, "metrics": metrics}
+        print(f"[model] horizon {days}d n_targets={len(models)}")
+    default = by_horizon.get(str(FORWARD_DAYS)) or next(iter(by_horizon.values()))
+    payload = {
+        "models": default["models"],
+        "metrics": default["metrics"],
+        "features": list(x.columns),
+        "by_horizon": by_horizon,
+        "default_days": FORWARD_DAYS,
+    }
     joblib.dump(payload, MODELS_DIR / "ridge_bundle.joblib")
     (MODELS_DIR / "metrics.json").write_text(
-        json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8"
+        json.dumps({k: v["metrics"] for k, v in by_horizon.items()}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
     return payload
+
+
+def _horizon_slice(bundle: dict[str, Any], days: int) -> dict[str, Any]:
+    by = bundle.get("by_horizon") or {}
+    slice_ = by.get(str(int(days)))
+    if not slice_:
+        return bundle
+    return {
+        "models": slice_.get("models") or {},
+        "metrics": slice_.get("metrics") or {},
+        "features": bundle.get("features") or slice_.get("features") or [],
+    }
 
 
 def load_models() -> dict[str, Any]:
@@ -164,16 +212,25 @@ def _regime(features: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-def allocate(panel: pd.DataFrame, features: pd.DataFrame, bundle: dict[str, Any] | None = None) -> dict[str, Any]:
+def allocate(
+    panel: pd.DataFrame,
+    features: pd.DataFrame,
+    bundle: dict[str, Any] | None = None,
+    horizon_days: int | None = None,
+) -> dict[str, Any]:
+    days = int(horizon_days or FORWARD_DAYS)
     bundle = bundle or load_models()
-    raw_scores = _score_latest(bundle, features)
-    metrics = bundle.get("metrics", {})
+    slice_ = _horizon_slice(bundle, days)
+    raw_scores = _score_latest(slice_, features)
+    metrics = slice_.get("metrics", {})
     last = features.iloc[-1]
+    adj_scale = min(1.0, (21 / max(days, 1)) ** 0.5)
     scores: dict[str, float] = {}
     for key, pred in raw_scores.items():
         hit = float((metrics.get(key) or {}).get("hit_rate", 0.5))
         r2 = float((metrics.get(key) or {}).get("test_r2", -1.0))
-        mom = float(last.get(f"{key}_mom_21", 0.0) or 0.0)
+        mom_raw = last.get(_mom_col(key, days), last.get(f"{key}_mom_21", 0.0))
+        mom = float(mom_raw) if mom_raw == mom_raw else 0.0
         mom = float(np.clip(mom, -0.15, 0.15))
         model_w = 0.15 if r2 < 0 else min(0.45, max(0.15, (hit - 0.5) * 2))
         scores[key] = model_w * pred + (1.0 - model_w) * mom
@@ -183,26 +240,27 @@ def allocate(panel: pd.DataFrame, features: pd.DataFrame, bundle: dict[str, Any]
 
     def adj(key: str, base: float) -> float:
         s = base
+        bump = adj_scale
         if regime["risk_off"] and key in {"gold"}:
-            s += 0.015
+            s += 0.015 * bump
         if regime["risk_off"] and key in {"kosdaq", "nasdaq", "bitcoin"}:
-            s -= 0.01
+            s -= 0.01 * bump
         if regime["easing"] and key in {"gold", "bitcoin", "nasdaq", "kosdaq"}:
-            s += 0.01
+            s += 0.01 * bump
         if regime["krw_strong"] and key in {"kospi", "kr_semi", "kr_ship"}:
-            s -= 0.008
+            s -= 0.008 * bump
         if regime["krw_weak"] and key in {"kospi", "kr_semi", "kr_ship"}:
-            s += 0.008
+            s += 0.008 * bump
         if regime["inverted_curve"] and key in {"us_finance", "kr_finance"}:
-            s -= 0.006
+            s -= 0.006 * bump
         if not regime["inverted_curve"] and key in {"us_finance", "kr_finance"}:
-            s += 0.004
+            s += 0.004 * bump
         for ev in events:
             bias = ev.get("bias") or {}
             if key in bias:
-                s += {"positive": 0.01, "negative": -0.01, "mixed": 0.0, "up": 0.005}.get(bias[key], 0.0)
+                s += bump * {"positive": 0.01, "negative": -0.01, "mixed": 0.0, "up": 0.005}.get(bias[key], 0.0)
             if bias.get("stocks") and key in ASSET_KEYS + MARKET_KEYS and key not in {"gold", "bitcoin"}:
-                s += {"positive": 0.008, "negative": -0.008, "mixed": 0.0}.get(bias["stocks"], 0.0)
+                s += bump * {"positive": 0.008, "negative": -0.008, "mixed": 0.0}.get(bias["stocks"], 0.0)
         return s
 
     asset_scores = {k: adj(k, scores.get(k, 0.0)) for k in ASSET_KEYS if k in scores or k in panel.columns}
@@ -236,7 +294,8 @@ def allocate(panel: pd.DataFrame, features: pd.DataFrame, bundle: dict[str, Any]
     report = {
         "asof": regime["asof"],
         "generated": date.today().isoformat(),
-        "horizon_days": FORWARD_DAYS,
+        "horizon_days": days,
+        "horizon_label": _horizon_label(days),
         "asset": pick_asset,
         "asset_label": ko(pick_asset),
         "market": chosen_market,
@@ -251,7 +310,7 @@ def allocate(panel: pd.DataFrame, features: pd.DataFrame, bundle: dict[str, Any]
         "market_scores": market_scores,
         "sector_scores": sector_scores,
         "model_scores": scores,
-        "metrics": bundle.get("metrics", {}),
+        "metrics": slice_.get("metrics", {}),
         "regime": regime,
         "active_events": [
             {"name_ko": e["name_ko"], "category": e["category"], "severity": e["severity"], "date": str(e["date"])[:10]}
@@ -297,5 +356,5 @@ def _forecast_tree(report: dict[str, Any]) -> dict[str, Any]:
             else None
         ),
         "reasons": reasons,
-        "horizon": f"향후 약 {report.get('horizon_days', 21)}거래일 상대 점수",
+        "horizon": f"향후 {report.get('horizon_label') or _horizon_label(int(report.get('horizon_days') or 21))}의 상대 점수",
     }

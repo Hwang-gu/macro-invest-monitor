@@ -100,6 +100,14 @@ SECTOR_KEYS = (
 )
 
 FORWARD_DAYS = 21
+# Future 탭 기간. id, 거래일, 화면 표기
+FUTURE_HORIZONS: tuple[tuple[str, int, str], ...] = (
+    ("1W", 5, "1주일"),
+    ("1M", 21, "1개월"),
+    ("3M", 63, "3개월"),
+    ("6M", 126, "6개월"),
+    ("1Y", 252, "1년"),
+)
 MIN_HISTORY_DAYS = 400
 RANDOM_STATE = 42
 

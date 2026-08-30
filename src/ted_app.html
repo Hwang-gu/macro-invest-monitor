@@ -108,7 +108,7 @@
     .menus button.on { background: #1e4d8c; border-color: #6ea2e6; }
     .panel { line-height: 1.55; font-size: .95rem; }
     .panel p { margin: 0 0 12px; }
-    #presentBody p, #future p { text-indent: 1.15em; }
+    #presentBody p, #futureBody p { text-indent: 1.15em; }
     .cal {
       margin: 0 0 22px;
       padding: 12px 10px 14px;
@@ -319,14 +319,14 @@
       .chart.compare { height: 220px; }
       .chart.group { height: 200px; }
       #present { display: flex; flex-direction: column; }
-      #presentBody, #future {
+      #presentBody, #futureBody {
         display: grid;
         grid-template-columns: minmax(0, 1fr) min(300px, 30%);
         gap: 8px 36px;
         align-items: start;
       }
-      #presentBody .brief-main, #future .brief-main { grid-column: 1; }
-      #presentBody .alloc-box, #future .alloc-box {
+      #presentBody .brief-main, #futureBody .brief-main { grid-column: 1; }
+      #presentBody .alloc-box, #futureBody .alloc-box {
         grid-column: 2;
         grid-row: 1;
         position: sticky;
@@ -435,7 +435,10 @@
         </div>
         <div id="presentBody"></div>
       </div>
-      <div id="future" class="panel hidden"></div>
+      <div id="future" class="panel hidden">
+        <div class="period-bar" id="futurePeriodBar"></div>
+        <div id="futureBody"></div>
+      </div>
     </section>
   </div>
 
@@ -922,6 +925,34 @@
       const rows = Object.entries(w || {}).sort((a,b)=>b[1]-a[1])
         .map(([k,v]) => `<div class="score-row"><span>${names[k]||k}</span><span>${(v*100).toFixed(0)}%</span></div>`).join("");
       return `<div class="alloc-box"><h3>&lt;자산별 투자 비중&gt;</h3>${rows}</div>`;
+    }
+
+    let futureHorizon = "1M";
+    function futureViews() {
+      if (Array.isArray(BOOT.futureHorizons) && BOOT.futureHorizons.length) return BOOT.futureHorizons;
+      return [{id: "1M", label: "1개월", days: 21, future: BOOT.future, weights: BOOT.weights}];
+    }
+    function showFuture(id) {
+      const views = futureViews();
+      const v = views.find(x => x.id === id) || views.find(x => x.id === "1M") || views[0];
+      if (!v) return;
+      futureHorizon = v.id;
+      const bar = $("futurePeriodBar");
+      if (bar) bar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.h === v.id));
+      $("futureBody").innerHTML = renderFuture(v.future) + weightsHtml(v.weights);
+    }
+    function wireFuturePeriods() {
+      const bar = $("futurePeriodBar");
+      if (!bar) return;
+      const views = futureViews();
+      bar.innerHTML = views.map(v =>
+        `<button type="button" data-h="${v.id}" class="${v.id === futureHorizon ? "on" : ""}">${v.label}</button>`
+      ).join("");
+      bar.onclick = e => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        showFuture(btn.dataset.h);
+      };
     }
 
     const ISSUE = {
@@ -1415,7 +1446,8 @@
     function enter(role, id) {
       currentUser = { role, id };
       $("who").textContent = role;
-      $("future").innerHTML = renderFuture(BOOT.future) + weightsHtml(BOOT.weights);
+      wireFuturePeriods();
+      showFuture("1M");
       $("presentBody").innerHTML = "";
       selectedPresent = "";
       calCursor = toMonth(BOOT.asof);
@@ -1602,7 +1634,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=18");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=20");
   </script>
 </body>
 </html>

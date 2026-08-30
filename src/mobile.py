@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .config import APP_DIR, ROOT, START, ted_accounts
+from .config import APP_DIR, FUTURE_HORIZONS, ROOT, START, ted_accounts
 from .narrative import future_briefing, present_briefing
 from .process import load_events
 
@@ -299,11 +299,35 @@ def write_mobile_app(
     report: dict[str, Any],
     panel: pd.DataFrame | None = None,
     channels: list[dict[str, Any]] | None = None,
+    features: pd.DataFrame | None = None,
+    bundle: dict[str, Any] | None = None,
 ) -> None:
     APP_DIR.mkdir(parents=True, exist_ok=True)
     seasonal = _seasonal_note(panel, str(report.get("asof"))) if panel is not None else {}
     extra_users = _extra_user_records()
     token = os.getenv("TED_SYNC_TOKEN", "").strip()
+    horizon_views: list[dict[str, Any]] = []
+    if bundle is not None and features is not None and panel is not None:
+        from .model import allocate
+        for hid, days, label in FUTURE_HORIZONS:
+            r = allocate(panel, features, bundle, horizon_days=days)
+            r["horizon_label"] = label
+            horizon_views.append({
+                "id": hid,
+                "label": label,
+                "days": days,
+                "future": future_briefing(r, seasonal),
+                "weights": _weights(r.get("asset_scores")),
+            })
+    if not horizon_views:
+        horizon_views.append({
+            "id": "1M",
+            "label": "1개월",
+            "days": int(report.get("horizon_days") or 21),
+            "future": future_briefing(report, seasonal),
+            "weights": _weights(report.get("asset_scores")),
+        })
+    default_view = next((v for v in horizon_views if v["id"] == "1M"), horizon_views[0])
     boot = {
         "asof": report.get("asof"),
         "auth": [
@@ -319,8 +343,9 @@ def write_mobile_app(
         "chart": _chart_bundle(panel) if panel is not None else {"dates": []},
         "events": _events_payload(),
         "present": present_briefing(report, channels),
-        "future": future_briefing(report, seasonal),
-        "weights": _weights(report.get("asset_scores")),
+        "future": default_view["future"],
+        "weights": default_view["weights"],
+        "futureHorizons": horizon_views,
         "disclaimer": report.get("disclaimer"),
     }
     _seed_archives_from_git()
