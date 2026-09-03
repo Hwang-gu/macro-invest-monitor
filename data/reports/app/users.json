@@ -43,5 +43,18 @@
       "iv": "TYCqV8LEmYIKCUaQ",
       "ct": "ibSmBdIe8sM0BVAIhxcnSdxF7GYy/EZmh302wakeToZEB80C3Ww8Z3dPTyNFmsgbt1fPnI2BICz8we59bIUBM5IW5auY1cVM97e/gJ27EslLQFkpmOpW85N8iJWgdiEuObtPWnwGaU6C3wj+wA=="
     }
+  },
+  {
+    "role": "User",
+    "id": "chuk125@naver.com",
+    "hash": "9d828517582dc034a9cfc0ac318c620c7908d02c61378e9e2919cda9d4983cb6",
+    "updated": 1788428928685,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "cAnKP5XmQZSCgRFm9ZC/Xg==",
+      "iv": "60CWTqA0MCgZFTEE",
+      "ct": "lu74C92hLTQb1VSEv93tTo9AIXPJmL4MkjdFsdqiDenKk8wJMzVPozaDy98C6giJTq0TFGuzU9YQxKdCYgYPSYM4QSJdFU6OLDW/rf+gH87/NZ6+ZyejVl+DAyD2qzHdfgxFqq5xmwmq40C3Gw=="
+    }
   }
 ]
