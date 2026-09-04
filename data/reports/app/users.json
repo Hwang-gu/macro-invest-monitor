@@ -56,5 +56,18 @@
       "iv": "60CWTqA0MCgZFTEE",
       "ct": "lu74C92hLTQb1VSEv93tTo9AIXPJmL4MkjdFsdqiDenKk8wJMzVPozaDy98C6giJTq0TFGuzU9YQxKdCYgYPSYM4QSJdFU6OLDW/rf+gH87/NZ6+ZyejVl+DAyD2qzHdfgxFqq5xmwmq40C3Gw=="
     }
+  },
+  {
+    "role": "User",
+    "id": "black_matrix@naver.com",
+    "hash": "0c4ab30542f0175ec27160f249b642383d91ef295ed563497a3630d61e24ffd5",
+    "updated": 1788497819394,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "pnzyKYyqhbytLUnkJU2TVA==",
+      "iv": "QDC5tA+cj92/32PI",
+      "ct": "HL9muCKUsIDj/0Ur8QZp2b7uAi1FC5rlRldxAK5QEQ52sXPac7LdrE0C2Rzc44a/kvinFdA+HAR20pwaKKlIwygH5qIzPb+w6WME3znFH1jNtrk6tgAx9sV84MQQwUPTXcet4F/ZMndN8VY5fw=="
+    }
   }
 ]
