@@ -212,6 +212,11 @@
     .modal-bg {
       position: fixed; inset: 0; background: rgba(0,0,0,.55);
       display: flex; align-items: center; justify-content: center; padding: 20px;
+      z-index: 80;
+    }
+    body:has(.modal-bg:not(.hidden)) .ad-banners {
+      visibility: hidden !important;
+      pointer-events: none !important;
     }
     .modal {
       background: #10192b; border: 1px solid #3a4d6b; border-radius: 14px;
@@ -2090,7 +2095,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=24");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=25");
   </script>
 </body>
 </html>
