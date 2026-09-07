@@ -125,6 +125,27 @@ def _extra_user_records() -> list[dict[str, Any]]:
     return rows
 
 
+def _load_ads() -> dict[str, Any]:
+    empty = {"place1": {"image": "", "url": ""}, "place2": {"image": "", "url": ""}}
+    path = ROOT / "data" / "ted_ads.json"
+    if not path.exists():
+        return empty
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return empty
+    if not isinstance(data, dict):
+        return empty
+    out = dict(empty)
+    for key in ("place1", "place2"):
+        row = data.get(key) if isinstance(data.get(key), dict) else {}
+        out[key] = {
+            "image": str(row.get("image") or "").strip(),
+            "url": str(row.get("url") or "").strip(),
+        }
+    return out
+
+
 def _daily_values(series: pd.Series, ndigits: int) -> list[float | None]:
     return [None if v != v else round(float(v), ndigits) for v in series]
 
@@ -347,6 +368,7 @@ def write_mobile_app(
         "weights": default_view["weights"],
         "futureHorizons": horizon_views,
         "disclaimer": report.get("disclaimer"),
+        "ads": _load_ads(),
     }
     _seed_archives_from_git()
     _write_present_archive(str(boot["asof"] or ""), boot["present"], boot["weights"])
@@ -368,6 +390,10 @@ def write_mobile_app(
         sync_js.unlink()
     (APP_DIR / "users.json").write_text(
         json.dumps(extra_users, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (APP_DIR / "ads.json").write_text(
+        json.dumps(boot.get("ads") or {}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     (APP_DIR / "latest.json").write_text(

@@ -91,6 +91,10 @@
     .check-row label { margin: 0; }
     .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; gap: 10px; }
     .top small { color: #b7c3d4; font-size: .78rem; }
+    .who-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+    .who-row #logoutBtn {
+      width: auto; margin: 0; padding: 3px 8px; font-size: .72rem;
+    }
     .top-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
     .top-actions button { width: auto; margin: 0; padding: 6px 10px; font-size: .8rem; }
     #app:not(.hidden) {
@@ -240,6 +244,65 @@
     .pw-toggle:hover { color: #fff; }
     .hint { color: #b7c3d4; font-size: .78rem; margin: 8px 0 12px; }
     .ok { color: #9ad0a8; font-size: .85rem; min-height: 1.2em; margin-top: 8px; text-align: center; }
+    .ad-banners {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 12px;
+    }
+    #app.home .ad-banners { display: flex; }
+    #app.home .ad-banners.empty { display: none; }
+    .ad-slot {
+      display: block;
+      border: 1px solid #2d5a9a;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #10192b;
+    }
+    .ad-slot img {
+      display: block;
+      width: 100%;
+      height: 56px;
+      object-fit: cover;
+    }
+    .ad-modal { width: min(400px, 100%); max-height: min(88vh, 720px); overflow: auto; }
+    .ad-place {
+      border: 1px solid #2d5a9a;
+      border-radius: 12px;
+      padding: 12px;
+      margin: 12px 0 0;
+      background: #0b1220;
+    }
+    .ad-place h3 {
+      margin: 0 0 10px;
+      font-size: .92rem;
+      font-weight: normal;
+      letter-spacing: .06em;
+      text-align: center;
+    }
+    .ad-preview {
+      min-height: 92px;
+      border: 1px dashed #3a4d6b;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: pointer;
+      background: #10192b;
+    }
+    .ad-preview img { display: block; width: 100%; height: 92px; object-fit: cover; }
+    .ad-spec {
+      margin: 0;
+      padding: 12px 10px;
+      color: #b7c3d4;
+      font-size: .72rem;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .ad-place-actions { display: flex; gap: 8px; }
+    .ad-place-actions button { flex: 1; margin-top: 10px; }
 
     @media (min-width: 960px) {
       html, body { height: 100%; }
@@ -375,14 +438,17 @@
             <img class="logo" src="logo.jpg" alt="Ted Investment"/>
             <div>
               <div>Ted Investment</div>
-              <small id="who"></small>
+              <div class="who-row">
+                <small id="who"></small>
+                <button class="ghost" id="logoutBtn" type="button">Logout</button>
+              </div>
             </div>
           </div>
         </div>
         <div class="top-actions">
-          <button class="ghost hidden" id="userAddBtn" type="button">User</button>
+          <button class="ghost hidden" id="userAddBtn" type="button">Managing User</button>
+          <button class="ghost hidden" id="adManageBtn" type="button">Managing AD</button>
           <button class="ghost" id="pwChangeBtn" type="button">비밀번호 변경</button>
-          <button class="ghost" id="logoutBtn" type="button">Logout</button>
         </div>
       </div>
       <nav class="menus">
@@ -390,6 +456,10 @@
         <button type="button" data-tab="present">Present</button>
         <button type="button" data-tab="future">Future</button>
       </nav>
+      <div class="ad-banners empty" id="adBanners">
+        <a class="ad-slot hidden" id="adPlace1" target="_blank" rel="noopener noreferrer"><img alt="Place 1"/></a>
+        <a class="ad-slot hidden" id="adPlace2" target="_blank" rel="noopener noreferrer"><img alt="Place 2"/></a>
+      </div>
       <div id="past" class="panel hidden">
         <div class="period-bar" id="periodBar"></div>
         <div class="legend">
@@ -451,7 +521,7 @@
 
   <div id="userModal" class="modal-bg hidden">
     <div class="modal form">
-      <h2>User</h2>
+      <h2>Managing User</h2>
       <div id="userList"></div>
       <label for="newUserId">ID</label>
       <input id="newUserId" autocomplete="off"/>
@@ -464,6 +534,42 @@
       <div class="ok" id="userOk"></div>
       <button class="primary" id="addUserBtn" type="button">Add new account</button>
       <button class="ghost" id="closeUser" type="button">Back</button>
+    </div>
+  </div>
+
+  <div id="adModal" class="modal-bg hidden">
+    <div class="modal form ad-modal">
+      <h2>Managing AD</h2>
+      <p class="hint">로그인 후 홈 화면 아래 Place①, Place②에 순서대로 표시됩니다.</p>
+      <div class="ad-place" data-place="place1">
+        <h3>Place①</h3>
+        <div class="ad-preview" data-pick="place1">
+          <p class="ad-spec">권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG 또는 PNG · 200KB 이하<br/>여기를 눌러 이미지를 선택하세요</p>
+        </div>
+        <input class="hidden" id="adFile1" type="file" accept="image/jpeg,image/png,image/webp"/>
+        <label for="adUrl1">연결 링크</label>
+        <input id="adUrl1" type="url" inputmode="url" placeholder="https://"/>
+        <div class="ad-place-actions">
+          <button class="primary" id="adSave1" type="button">저장</button>
+          <button class="ghost" id="adDel1" type="button">삭제</button>
+        </div>
+      </div>
+      <div class="ad-place" data-place="place2">
+        <h3>Place②</h3>
+        <div class="ad-preview" data-pick="place2">
+          <p class="ad-spec">권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG 또는 PNG · 200KB 이하<br/>여기를 눌러 이미지를 선택하세요</p>
+        </div>
+        <input class="hidden" id="adFile2" type="file" accept="image/jpeg,image/png,image/webp"/>
+        <label for="adUrl2">연결 링크</label>
+        <input id="adUrl2" type="url" inputmode="url" placeholder="https://"/>
+        <div class="ad-place-actions">
+          <button class="primary" id="adSave2" type="button">저장</button>
+          <button class="ghost" id="adDel2" type="button">삭제</button>
+        </div>
+      </div>
+      <div class="err" id="adErr"></div>
+      <div class="ok" id="adOk"></div>
+      <button class="ghost" id="closeAd" type="button">닫기</button>
     </div>
   </div>
 
@@ -497,6 +603,10 @@
     const AUTO_KEY = "ted_auto_sign";
     const USERS_API = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/data/ted_users.json";
     const USERS_RAW = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ted_users.json";
+    const ADS_API = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/data/ted_ads.json";
+    const ADS_RAW = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ted_ads.json";
+    const ADS_KEY = "ted_ads";
+    const AD_SPEC = "권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG 또는 PNG · 200KB 이하<br/>여기를 눌러 이미지를 선택하세요";
     let sharedUsers = [];
     let currentUser = null;
     let pwTarget = null;
@@ -695,10 +805,11 @@
       bytes.forEach(b => bin += String.fromCharCode(b));
       return btoa(bin);
     }
-    async function githubSaveUsers(list) {
+    async function githubPutJson(path, message, data) {
       const token = currentWriteToken();
       if (!token) return false;
-      const body = JSON.stringify(list, null, 2);
+      const api = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/" + path;
+      const body = JSON.stringify(data, null, 2);
       const headersFor = (scheme) => ({
         Authorization: scheme + " " + token,
         Accept: "application/vnd.github+json",
@@ -706,12 +817,12 @@
       });
       const putOnce = async (headers, sha) => {
         const payload = {
-          message: "update ted users",
+          message,
           content: utf8ToB64(body),
           branch: "main"
         };
         if (sha) payload.sha = sha;
-        return fetch(USERS_API, {
+        return fetch(api, {
           method: "PUT",
           headers: Object.assign({ "Content-Type": "application/json" }, headers),
           body: JSON.stringify(payload)
@@ -721,12 +832,12 @@
         const headers = headersFor(scheme);
         let sha;
         try {
-          const cur = await fetch(USERS_API, { headers });
+          const cur = await fetch(api, { headers });
           if (cur.ok) sha = (await cur.json()).sha;
         } catch {}
         let r = await putOnce(headers, sha);
         if (r.status === 409) {
-          const cur = await fetch(USERS_API, { headers });
+          const cur = await fetch(api, { headers });
           if (cur.ok) sha = (await cur.json()).sha;
           r = await putOnce(headers, sha);
         }
@@ -736,6 +847,13 @@
         if (await tryPut("Bearer")) return true;
         if (await tryPut("token")) return true;
       } catch {}
+      return false;
+    }
+    async function githubSaveUsers(list) {
+      const token = currentWriteToken();
+      if (!token) return false;
+      if (await githubPutJson("data/ted_users.json", "update ted users", list)) return true;
+      const body = JSON.stringify(list, null, 2);
       try {
         const r = await fetch("https://api.github.com/repos/Hwang-gu/macro-invest-monitor/dispatches", {
           method: "POST",
@@ -843,6 +961,176 @@
           openPwModal(store[Number(btn.dataset.pw)]);
         };
       });
+    }
+
+    function emptyAds() {
+      return { place1: { image: "", url: "" }, place2: { image: "", url: "" } };
+    }
+    function normalizeAds(data) {
+      const out = emptyAds();
+      if (!data || typeof data !== "object" || Array.isArray(data)) return out;
+      ["place1", "place2"].forEach(k => {
+        const row = data[k] || {};
+        out[k] = {
+          image: String(row.image || "").trim(),
+          url: String(row.url || "").trim()
+        };
+      });
+      return out;
+    }
+    function localAds() {
+      try { return normalizeAds(JSON.parse(localStorage.getItem(ADS_KEY) || "null")); }
+      catch { return emptyAds(); }
+    }
+    let ads = normalizeAds(BOOT.ads);
+    if (!ads.place1.image && !ads.place2.image) ads = localAds();
+    let adDrafts = emptyAds();
+    function saveLocalAds(next) {
+      ads = normalizeAds(next);
+      localStorage.setItem(ADS_KEY, JSON.stringify(ads));
+    }
+    function safeHref(url) {
+      try {
+        const u = new URL(url, location.href);
+        return u.protocol === "http:" || u.protocol === "https:" ? u.href : "";
+      } catch {
+        return "";
+      }
+    }
+    function renderAdBanners() {
+      [["place1", "adPlace1"], ["place2", "adPlace2"]].forEach(([key, id]) => {
+        const slot = $(id);
+        const row = ads[key] || {};
+        const img = slot.querySelector("img");
+        const href = safeHref(row.url);
+        if (row.image && href) {
+          img.src = row.image;
+          slot.href = href;
+          slot.classList.remove("hidden");
+        } else {
+          img.removeAttribute("src");
+          slot.removeAttribute("href");
+          slot.classList.add("hidden");
+        }
+      });
+      const has = ["place1", "place2"].some(k => ads[k] && ads[k].image && safeHref(ads[k].url));
+      $("adBanners").classList.toggle("empty", !has);
+    }
+    function renderAdEditor() {
+      [["place1", "adUrl1", "adFile1"], ["place2", "adUrl2", "adFile2"]].forEach(([key, urlId, fileId]) => {
+        const row = adDrafts[key] || { image: "", url: "" };
+        $(urlId).value = row.url || "";
+        $(fileId).value = "";
+        const box = document.querySelector('.ad-preview[data-pick="' + key + '"]');
+        if (!box) return;
+        box.innerHTML = "";
+        if (row.image) {
+          const img = document.createElement("img");
+          img.alt = key === "place1" ? "Place 1" : "Place 2";
+          img.src = row.image;
+          box.appendChild(img);
+        } else {
+          box.innerHTML = `<p class="ad-spec">${AD_SPEC}</p>`;
+        }
+      });
+    }
+    async function loadAdsJson(url, headers) {
+      const r = await fetch(url, { cache: "no-store", headers: headers || {} });
+      if (!r.ok) return null;
+      const data = await r.json();
+      if (data && typeof data.content === "string") return JSON.parse(b64ToUtf8(data.content));
+      return data;
+    }
+    async function refreshAds() {
+      const tries = [
+        () => loadAdsJson(ADS_API + "?t=" + Date.now(), { Accept: "application/vnd.github+json" }),
+        () => loadAdsJson(ADS_RAW + "?t=" + Date.now()),
+        () => loadAdsJson("ads.json?t=" + Date.now())
+      ];
+      for (const load of tries) {
+        try {
+          const data = await load();
+          if (!data) continue;
+          ads = normalizeAds(data);
+          localStorage.setItem(ADS_KEY, JSON.stringify(ads));
+          renderAdBanners();
+          return;
+        } catch {}
+      }
+      renderAdBanners();
+    }
+    async function saveAds(next) {
+      saveLocalAds(next);
+      renderAdBanners();
+      return githubPutJson("data/ted_ads.json", "update ted ads", ads);
+    }
+    function readAdImage(file) {
+      return new Promise((resolve, reject) => {
+        if (!file) return reject(new Error("file"));
+        if (file.size > 2 * 1024 * 1024) return reject(new Error("size"));
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const maxW = 800;
+          const scale = Math.min(1, maxW / Math.max(img.width, 1));
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          let q = 0.86;
+          let data = canvas.toDataURL("image/jpeg", q);
+          while (data.length > 280000 && q > 0.5) {
+            q -= 0.08;
+            data = canvas.toDataURL("image/jpeg", q);
+          }
+          resolve(data);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("image"));
+        };
+        img.src = url;
+      });
+    }
+    async function saveAdPlace(key, urlId) {
+      $("adErr").textContent = "";
+      $("adOk").textContent = "";
+      const image = String((adDrafts[key] || {}).image || "").trim();
+      const url = String($(urlId).value || "").trim();
+      if (!image || !safeHref(url)) {
+        $("adErr").textContent = "배너 이미지와 https 연결 링크를 모두 넣어 주세요.";
+        return;
+      }
+      adDrafts[key] = { image, url };
+      const next = Object.assign(emptyAds(), ads, { [key]: { image, url } });
+      let synced = false;
+      try { synced = await saveAds(next); }
+      catch { $("adErr").textContent = "이 브라우저에 광고를 저장하지 못했습니다."; return; }
+      renderAdEditor();
+      $("adOk").textContent = synced
+        ? (key === "place1" ? "Place①" : "Place②") + " 광고를 저장했습니다."
+        : "이 기기에는 저장됐습니다. 다른 기기에도 바로 쓰려면 매니저로 다시 로그인해 주세요.";
+    }
+    async function clearAdPlace(key) {
+      $("adErr").textContent = "";
+      $("adOk").textContent = "";
+      adDrafts[key] = { image: "", url: "" };
+      const next = Object.assign(emptyAds(), ads, { [key]: { image: "", url: "" } });
+      let synced = false;
+      try { synced = await saveAds(next); }
+      catch { $("adErr").textContent = "삭제하지 못했습니다."; return; }
+      renderAdEditor();
+      $("adOk").textContent = synced
+        ? "삭제했습니다."
+        : "이 기기에서는 지웠습니다. 다른 기기에도 맞추려면 매니저로 다시 로그인해 주세요.";
+    }
+    function openAdModal() {
+      $("adErr").textContent = "";
+      $("adOk").textContent = "";
+      adDrafts = normalizeAds(ads);
+      renderAdEditor();
+      $("adModal").classList.remove("hidden");
     }
 
     function show(id) {
@@ -1453,10 +1741,13 @@
       calCursor = toMonth(BOOT.asof);
       renderCal();
       $("userAddBtn").classList.toggle("hidden", role !== "Manager");
+      $("adManageBtn").classList.toggle("hidden", role !== "Manager");
       $("pwChangeBtn").classList.toggle("hidden", role !== "User");
       loadWriteToken();
       show("app");
       showHome();
+      renderAdBanners();
+      refreshAds();
     }
 
     $("loginBtn").onclick = async () => {
@@ -1536,6 +1827,7 @@
       clearAuto();
       $("autoSign").checked = false;
       $("userModal").classList.add("hidden");
+      $("adModal").classList.add("hidden");
       $("pwModal").classList.add("hidden");
       show("login");
     };
@@ -1547,6 +1839,40 @@
     };
     $("closeUser").onclick = () => $("userModal").classList.add("hidden");
     $("userModal").onclick = (e) => { if (e.target.id === "userModal") $("userModal").classList.add("hidden"); };
+    $("adManageBtn").onclick = () => openAdModal();
+    $("closeAd").onclick = () => $("adModal").classList.add("hidden");
+    $("adModal").onclick = (e) => { if (e.target.id === "adModal") $("adModal").classList.add("hidden"); };
+    $("adSave1").onclick = () => saveAdPlace("place1", "adUrl1");
+    $("adSave2").onclick = () => saveAdPlace("place2", "adUrl2");
+    $("adDel1").onclick = () => clearAdPlace("place1");
+    $("adDel2").onclick = () => clearAdPlace("place2");
+    document.querySelectorAll(".ad-preview[data-pick]").forEach(box => {
+      box.onclick = () => $(box.dataset.pick === "place1" ? "adFile1" : "adFile2").click();
+    });
+    $("adFile1").onchange = async () => {
+      const file = $("adFile1").files && $("adFile1").files[0];
+      $("adErr").textContent = "";
+      if (!file) return;
+      try {
+        adDrafts.place1.image = await readAdImage(file);
+        adDrafts.place1.url = $("adUrl1").value.trim();
+        renderAdEditor();
+      } catch {
+        $("adErr").textContent = "이미지는 2MB 이하의 JPG 또는 PNG로 넣어 주세요.";
+      }
+    };
+    $("adFile2").onchange = async () => {
+      const file = $("adFile2").files && $("adFile2").files[0];
+      $("adErr").textContent = "";
+      if (!file) return;
+      try {
+        adDrafts.place2.image = await readAdImage(file);
+        adDrafts.place2.url = $("adUrl2").value.trim();
+        renderAdEditor();
+      } catch {
+        $("adErr").textContent = "이미지는 2MB 이하의 JPG 또는 PNG로 넣어 주세요.";
+      }
+    };
     $("pwChangeBtn").onclick = () => {
       $("pwSaveBtn").disabled = false;
       openPwModal(null);
@@ -1634,7 +1960,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=20");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=21");
   </script>
 </body>
 </html>
