@@ -251,7 +251,12 @@
       margin-top: auto;
       padding-top: 12px;
     }
-    #app.home .ad-banners { display: flex; }
+    #app.home .ad-banners {
+      display: flex;
+      position: relative;
+      z-index: 2;
+      flex-shrink: 0;
+    }
     #app.home .ad-banners.empty { display: none; }
     .ad-slot {
       display: block;
@@ -259,13 +264,16 @@
       border-radius: 8px;
       overflow: hidden;
       background: #10192b;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(110, 162, 230, .35);
     }
     .ad-slot img {
       display: block;
       width: 100%;
       height: auto;
       object-fit: contain;
-      vertical-align: top;
+      pointer-events: none;
     }
     .ad-modal { width: min(400px, 100%); max-height: min(88vh, 720px); overflow: auto; }
     .ad-place {
@@ -1041,6 +1049,21 @@
       } catch {
         return "";
       }
+    }
+    function isStandaloneApp() {
+      return window.matchMedia("(display-mode: standalone)").matches
+        || window.matchMedia("(display-mode: fullscreen)").matches
+        || window.navigator.standalone === true;
+    }
+    function openAdLink(url) {
+      const href = safeHref(url);
+      if (!href) return;
+      if (isStandaloneApp()) {
+        location.assign(href);
+        return;
+      }
+      const opened = window.open(href, "_blank", "noopener,noreferrer");
+      if (!opened) location.assign(href);
     }
     function renderAdBanners() {
       [["place1", "adPlace1"], ["place2", "adPlace2"]].forEach(([key, id]) => {
@@ -1942,6 +1965,14 @@
     $("closeUser").onclick = () => $("userModal").classList.add("hidden");
     $("userModal").onclick = (e) => { if (e.target.id === "userModal") $("userModal").classList.add("hidden"); };
     $("adManageBtn").onclick = () => openAdModal();
+    $("adBanners").onclick = (e) => {
+      const slot = e.target.closest("a.ad-slot");
+      if (!slot || slot.classList.contains("hidden")) return;
+      const href = slot.getAttribute("href");
+      if (!href) return;
+      e.preventDefault();
+      openAdLink(href);
+    };
     $("closeAd").onclick = () => $("adModal").classList.add("hidden");
     $("adModal").onclick = (e) => { if (e.target.id === "adModal") $("adModal").classList.add("hidden"); };
     $("adSave1").onclick = () => saveAdPlace("place1", "adUrl1");
@@ -2059,7 +2090,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=23");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=24");
   </script>
 </body>
 </html>
