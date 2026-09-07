@@ -301,6 +301,26 @@
       line-height: 1.45;
       text-align: center;
     }
+    .ad-file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+    }
+    label.ad-pick-btn {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      padding: 10px 12px;
+      font-size: .86rem;
+      text-align: center;
+      border-radius: 10px;
+      border: 1px solid #3a4d6b;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+    }
     .ad-place-actions { display: flex; gap: 8px; }
     .ad-place-actions button { flex: 1; margin-top: 10px; }
 
@@ -543,10 +563,11 @@
       <p class="hint">로그인 후 홈 화면 아래 Place①, Place②에 순서대로 표시됩니다.</p>
       <div class="ad-place" data-place="place1">
         <h3>Place①</h3>
-        <div class="ad-preview" data-pick="place1">
-          <p class="ad-spec">권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG 또는 PNG · 200KB 이하<br/>여기를 눌러 이미지를 선택하세요</p>
-        </div>
-        <input class="hidden" id="adFile1" type="file" accept="image/jpeg,image/png,image/webp"/>
+        <label class="ad-preview" for="adFile1" data-pick="place1">
+          <p class="ad-spec">권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG · PNG · 휴대폰 사진<br/>여기를 누르거나 아래 사진 선택</p>
+        </label>
+        <input id="adFile1" class="ad-file" type="file" accept="image/*"/>
+        <label class="ad-pick-btn" for="adFile1">사진 선택</label>
         <label for="adUrl1">연결 링크</label>
         <input id="adUrl1" type="url" inputmode="url" placeholder="https://"/>
         <div class="ad-place-actions">
@@ -556,10 +577,11 @@
       </div>
       <div class="ad-place" data-place="place2">
         <h3>Place②</h3>
-        <div class="ad-preview" data-pick="place2">
-          <p class="ad-spec">권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG 또는 PNG · 200KB 이하<br/>여기를 눌러 이미지를 선택하세요</p>
-        </div>
-        <input class="hidden" id="adFile2" type="file" accept="image/jpeg,image/png,image/webp"/>
+        <label class="ad-preview" for="adFile2" data-pick="place2">
+          <p class="ad-spec">권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG · PNG · 휴대폰 사진<br/>여기를 누르거나 아래 사진 선택</p>
+        </label>
+        <input id="adFile2" class="ad-file" type="file" accept="image/*"/>
+        <label class="ad-pick-btn" for="adFile2">사진 선택</label>
         <label for="adUrl2">연결 링크</label>
         <input id="adUrl2" type="url" inputmode="url" placeholder="https://"/>
         <div class="ad-place-actions">
@@ -606,7 +628,8 @@
     const ADS_API = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/data/ted_ads.json";
     const ADS_RAW = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ted_ads.json";
     const ADS_KEY = "ted_ads";
-    const AD_SPEC = "권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG 또는 PNG · 200KB 이하<br/>여기를 눌러 이미지를 선택하세요";
+    const AD_IMAGE_BASE = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ads/";
+    const AD_SPEC = "권장 규격<br/>가로 800px · 세로 120~160px<br/>JPG · PNG · 휴대폰 사진<br/>여기를 누르거나 아래 사진 선택";
     let sharedUsers = [];
     let currentUser = null;
     let pwTarget = null;
@@ -800,16 +823,20 @@
       catch { return null; }
     }
     function utf8ToB64(text) {
-      const bytes = new TextEncoder().encode(text);
+      return u8ToB64(new TextEncoder().encode(text));
+    }
+    function u8ToB64(bytes) {
+      const chunk = 0x8000;
       let bin = "";
-      bytes.forEach(b => bin += String.fromCharCode(b));
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
       return btoa(bin);
     }
-    async function githubPutJson(path, message, data) {
+    async function githubPutContent(path, message, contentB64) {
       const token = currentWriteToken();
       if (!token) return false;
       const api = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/" + path;
-      const body = JSON.stringify(data, null, 2);
       const headersFor = (scheme) => ({
         Authorization: scheme + " " + token,
         Accept: "application/vnd.github+json",
@@ -818,7 +845,7 @@
       const putOnce = async (headers, sha) => {
         const payload = {
           message,
-          content: utf8ToB64(body),
+          content: contentB64,
           branch: "main"
         };
         if (sha) payload.sha = sha;
@@ -848,6 +875,9 @@
         if (await tryPut("token")) return true;
       } catch {}
       return false;
+    }
+    async function githubPutJson(path, message, data) {
+      return githubPutContent(path, message, utf8ToB64(JSON.stringify(data, null, 2)));
     }
     async function githubSaveUsers(list) {
       const token = currentWriteToken();
@@ -964,7 +994,7 @@
     }
 
     function emptyAds() {
-      return { place1: { image: "", url: "" }, place2: { image: "", url: "" } };
+      return { place1: { image: "", url: "", updated: 0 }, place2: { image: "", url: "", updated: 0 } };
     }
     function normalizeAds(data) {
       const out = emptyAds();
@@ -973,10 +1003,19 @@
         const row = data[k] || {};
         out[k] = {
           image: String(row.image || "").trim(),
-          url: String(row.url || "").trim()
+          url: String(row.url || "").trim(),
+          updated: Number(row.updated || 0)
         };
       });
       return out;
+    }
+    function adImageSrc(row) {
+      const src = String((row && row.image) || "");
+      if (!src) return "";
+      if (src.indexOf("data:") === 0) return src;
+      const t = Number((row && row.updated) || 0);
+      if (!t) return src;
+      return src + (src.indexOf("?") >= 0 ? "&" : "?") + "t=" + t;
     }
     function localAds() {
       try { return normalizeAds(JSON.parse(localStorage.getItem(ADS_KEY) || "null")); }
@@ -1004,7 +1043,7 @@
         const img = slot.querySelector("img");
         const href = safeHref(row.url);
         if (row.image && href) {
-          img.src = row.image;
+          img.src = adImageSrc(row);
           slot.href = href;
           slot.classList.remove("hidden");
         } else {
@@ -1027,7 +1066,7 @@
         if (row.image) {
           const img = document.createElement("img");
           img.alt = key === "place1" ? "Place 1" : "Place 2";
-          img.src = row.image;
+          img.src = adImageSrc(row);
           box.appendChild(img);
         } else {
           box.innerHTML = `<p class="ad-spec">${AD_SPEC}</p>`;
@@ -1064,53 +1103,103 @@
       renderAdBanners();
       return githubPutJson("data/ted_ads.json", "update ted ads", ads);
     }
-    function readAdImage(file) {
+    function dataUrlToB64(dataUrl) {
+      const i = String(dataUrl || "").indexOf(",");
+      return i >= 0 ? String(dataUrl).slice(i + 1).replace(/\s/g, "") : "";
+    }
+    async function uploadAdImage(key, dataUrl) {
+      const b64 = dataUrlToB64(dataUrl);
+      if (!b64) return "";
+      const path = "data/ads/" + key + ".jpg";
+      if (!(await githubPutContent(path, "update ted ad image", b64))) return "";
+      return AD_IMAGE_BASE + key + ".jpg";
+    }
+    function cropToBanner(src, dw, dh) {
+      const canvas = document.createElement("canvas");
+      canvas.width = dw;
+      canvas.height = dh;
+      const ctx = canvas.getContext("2d");
+      const sr = src.width / Math.max(src.height, 1);
+      const dr = dw / dh;
+      let sx = 0, sy = 0, sw = src.width, sh = src.height;
+      if (sr > dr) {
+        sw = src.height * dr;
+        sx = (src.width - sw) / 2;
+      } else {
+        sh = src.width / dr;
+        sy = (src.height - sh) / 2;
+      }
+      ctx.drawImage(src, sx, sy, sw, sh, 0, 0, dw, dh);
+      let q = 0.86;
+      let data = canvas.toDataURL("image/jpeg", q);
+      while (data.length > 180000 && q > 0.45) {
+        q -= 0.08;
+        data = canvas.toDataURL("image/jpeg", q);
+      }
+      return data;
+    }
+    function loadImageElement(file) {
       return new Promise((resolve, reject) => {
-        if (!file) return reject(new Error("file"));
-        if (file.size > 2 * 1024 * 1024) return reject(new Error("size"));
         const img = new Image();
         const url = URL.createObjectURL(file);
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const maxW = 800;
-          const scale = Math.min(1, maxW / Math.max(img.width, 1));
-          canvas.width = Math.max(1, Math.round(img.width * scale));
-          canvas.height = Math.max(1, Math.round(img.height * scale));
-          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        const done = (ok) => {
           URL.revokeObjectURL(url);
-          let q = 0.86;
-          let data = canvas.toDataURL("image/jpeg", q);
-          while (data.length > 280000 && q > 0.5) {
-            q -= 0.08;
-            data = canvas.toDataURL("image/jpeg", q);
-          }
-          resolve(data);
+          if (ok) resolve(img);
+          else reject(new Error("image"));
         };
+        img.onload = () => done(true);
         img.onerror = () => {
           URL.revokeObjectURL(url);
-          reject(new Error("image"));
+          const fr = new FileReader();
+          fr.onload = () => {
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error("image"));
+            img.src = String(fr.result || "");
+          };
+          fr.onerror = () => reject(new Error("image"));
+          fr.readAsDataURL(file);
         };
         img.src = url;
       });
     }
+    async function readAdImage(file) {
+      if (!file) throw new Error("file");
+      let src;
+      if (typeof createImageBitmap === "function") {
+        try { src = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+        catch { src = null; }
+      }
+      if (!src) src = await loadImageElement(file);
+      try { return cropToBanner(src, 800, 160); }
+      finally { if (src && src.close) src.close(); }
+    }
     async function saveAdPlace(key, urlId) {
       $("adErr").textContent = "";
       $("adOk").textContent = "";
-      const image = String((adDrafts[key] || {}).image || "").trim();
+      let image = String((adDrafts[key] || {}).image || "").trim();
       const url = String($(urlId).value || "").trim();
       if (!image || !safeHref(url)) {
         $("adErr").textContent = "배너 이미지와 https 연결 링크를 모두 넣어 주세요.";
         return;
       }
-      adDrafts[key] = { image, url };
-      const next = Object.assign(emptyAds(), ads, { [key]: { image, url } });
+      if (image.indexOf("data:") === 0) {
+        const uploaded = await uploadAdImage(key, image);
+        if (!uploaded) {
+          $("adErr").textContent = "사진을 올리지 못했습니다. 매니저로 다시 로그인한 뒤 저장해 주세요.";
+          return;
+        }
+        image = uploaded;
+      }
+      const row = { image, url, updated: Date.now() };
+      adDrafts[key] = row;
+      const next = Object.assign(emptyAds(), ads, { [key]: row });
       let synced = false;
       try { synced = await saveAds(next); }
       catch { $("adErr").textContent = "이 브라우저에 광고를 저장하지 못했습니다."; return; }
       renderAdEditor();
       $("adOk").textContent = synced
-        ? (key === "place1" ? "Place①" : "Place②") + " 광고를 저장했습니다."
-        : "이 기기에는 저장됐습니다. 다른 기기에도 바로 쓰려면 매니저로 다시 로그인해 주세요.";
+        ? (key === "place1" ? "Place①" : "Place②") + " 광고를 저장했습니다. 다른 기기에서도 곧 보입니다."
+        : "사진은 올렸지만 목록 저장에 실패했습니다. 매니저로 다시 로그인해 주세요.";
     }
     async function clearAdPlace(key) {
       $("adErr").textContent = "";
@@ -1846,9 +1935,6 @@
     $("adSave2").onclick = () => saveAdPlace("place2", "adUrl2");
     $("adDel1").onclick = () => clearAdPlace("place1");
     $("adDel2").onclick = () => clearAdPlace("place2");
-    document.querySelectorAll(".ad-preview[data-pick]").forEach(box => {
-      box.onclick = () => $(box.dataset.pick === "place1" ? "adFile1" : "adFile2").click();
-    });
     $("adFile1").onchange = async () => {
       const file = $("adFile1").files && $("adFile1").files[0];
       $("adErr").textContent = "";
@@ -1858,7 +1944,7 @@
         adDrafts.place1.url = $("adUrl1").value.trim();
         renderAdEditor();
       } catch {
-        $("adErr").textContent = "이미지는 2MB 이하의 JPG 또는 PNG로 넣어 주세요.";
+        $("adErr").textContent = "사진을 읽지 못했습니다. 다른 사진으로 다시 시도해 주세요.";
       }
     };
     $("adFile2").onchange = async () => {
@@ -1870,7 +1956,7 @@
         adDrafts.place2.url = $("adUrl2").value.trim();
         renderAdEditor();
       } catch {
-        $("adErr").textContent = "이미지는 2MB 이하의 JPG 또는 PNG로 넣어 주세요.";
+        $("adErr").textContent = "사진을 읽지 못했습니다. 다른 사진으로 다시 시도해 주세요.";
       }
     };
     $("pwChangeBtn").onclick = () => {
@@ -1960,7 +2046,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=21");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=22");
   </script>
 </body>
 </html>

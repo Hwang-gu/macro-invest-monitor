@@ -142,6 +142,7 @@ def _load_ads() -> dict[str, Any]:
         out[key] = {
             "image": str(row.get("image") or "").strip(),
             "url": str(row.get("url") or "").strip(),
+            "updated": int(row["updated"]) if isinstance(row.get("updated"), (int, float)) and row.get("updated") else 0,
         }
     return out
 
@@ -396,6 +397,12 @@ def write_mobile_app(
         json.dumps(boot.get("ads") or {}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    ads_src = ROOT / "data" / "ads"
+    ads_dest = APP_DIR / "ads"
+    if ads_dest.exists():
+        shutil.rmtree(ads_dest)
+    if ads_src.exists():
+        shutil.copytree(ads_src, ads_dest)
     (APP_DIR / "latest.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
     )

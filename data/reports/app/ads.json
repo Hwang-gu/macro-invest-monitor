@@ -1,10 +1,12 @@
 {
   "place1": {
     "image": "",
-    "url": ""
+    "url": "",
+    "updated": 0
   },
   "place2": {
     "image": "",
-    "url": ""
+    "url": "",
+    "updated": 0
   }
 }
