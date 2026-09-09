@@ -147,6 +147,41 @@ def _load_ads() -> dict[str, Any]:
     return out
 
 
+def _load_newsletters() -> dict[str, Any]:
+    path = ROOT / "data" / "ted_newsletters.json"
+    allowed = {"gold", "stock", "bitcoin"}
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for key, row in data.items():
+        email = str(key or "").strip().lower()
+        if not email or not isinstance(row, dict):
+            continue
+        raw_cats = row.get("categories") if isinstance(row.get("categories"), list) else []
+        categories = []
+        for cat in raw_cats:
+            name = str(cat or "").strip().lower()
+            if name in allowed and name not in categories:
+                categories.append(name)
+        if isinstance(row.get("keywords"), list):
+            keywords = [str(s).strip() for s in row["keywords"] if str(s).strip()]
+        else:
+            keywords = [s.strip() for s in str(row.get("keywords") or "").replace("，", ",").split(",") if s.strip()]
+        out[email] = {
+            "categories": categories,
+            "keywords": keywords,
+            "active": row.get("active") is not False,
+            "updated": int(row["updated"]) if isinstance(row.get("updated"), (int, float)) and row.get("updated") else 0,
+        }
+    return out
+
+
 def _daily_values(series: pd.Series, ndigits: int) -> list[float | None]:
     return [None if v != v else round(float(v), ndigits) for v in series]
 
@@ -370,6 +405,7 @@ def write_mobile_app(
         "futureHorizons": horizon_views,
         "disclaimer": report.get("disclaimer"),
         "ads": _load_ads(),
+        "newsletters": _load_newsletters(),
     }
     _seed_archives_from_git()
     _write_present_archive(str(boot["asof"] or ""), boot["present"], boot["weights"])
@@ -395,6 +431,10 @@ def write_mobile_app(
     )
     (APP_DIR / "ads.json").write_text(
         json.dumps(boot.get("ads") or {}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (APP_DIR / "newsletters.json").write_text(
+        json.dumps(boot.get("newsletters") or {}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     ads_src = ROOT / "data" / "ads"

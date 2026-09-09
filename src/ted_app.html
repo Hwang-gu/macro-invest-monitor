@@ -109,6 +109,7 @@
     }
     .menus { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
     .menus button { text-align: center; letter-spacing: .16em; }
+    .menus button[data-tab="news"] { letter-spacing: .06em; font-size: .92rem; white-space: normal; line-height: 1.25; }
     .menus button.on { background: #1e4d8c; border-color: #6ea2e6; }
     .panel { line-height: 1.55; font-size: .95rem; }
     .panel p { margin: 0 0 12px; }
@@ -337,6 +338,25 @@
     }
     .ad-place-actions { display: flex; gap: 8px; }
     .ad-place-actions button { flex: 1; margin-top: 10px; }
+    .news-form { max-width: 420px; }
+    .news-form h3 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      font-weight: normal;
+      letter-spacing: .06em;
+      text-align: center;
+    }
+    .news-cats { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 16px; }
+    .news-cat {
+      display: flex; align-items: center; gap: 10px;
+      margin: 0; font-size: 1rem; color: #fff;
+    }
+    .news-cat input[type="checkbox"] {
+      width: 18px; height: 18px; padding: 0; margin: 0;
+      accent-color: #6ea2e6;
+    }
+    .news-form button.primary { margin-top: 12px; }
+    .news-form button.ghost { margin-top: 8px; }
 
     @media (min-width: 960px) {
       html, body { height: 100%; }
@@ -381,7 +401,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        max-width: 220px;
+        max-width: 280px;
         width: 100%;
         margin-left: auto;
         margin-right: auto;
@@ -395,6 +415,10 @@
         height: auto;
         letter-spacing: .14em;
       }
+      #app.home .menus button[data-tab="news"] {
+        letter-spacing: .04em;
+        font-size: .78rem;
+      }
       #app.home .ad-banners {
         width: min(720px, 100%);
         margin-left: auto;
@@ -402,6 +426,7 @@
       }
       .menus {
         flex-direction: row;
+        flex-wrap: wrap;
         justify-content: center;
         gap: 20px;
         margin-bottom: 28px;
@@ -494,6 +519,7 @@
         <button type="button" data-tab="past">Past</button>
         <button type="button" data-tab="present">Present</button>
         <button type="button" data-tab="future">Future</button>
+        <button type="button" data-tab="news">Apply for news letter</button>
       </nav>
       <div class="ad-banners empty" id="adBanners">
         <a class="ad-slot hidden" id="adPlace1" target="_blank" rel="noopener noreferrer"><img alt="Place 1"/></a>
@@ -547,6 +573,24 @@
       <div id="future" class="panel hidden">
         <div class="period-bar" id="futurePeriodBar"></div>
         <div id="futureBody"></div>
+      </div>
+      <div id="news" class="panel hidden">
+        <div class="news-form">
+          <h3>Apply for news letter</h3>
+          <p class="hint">원하는 카테고리를 고르면 평일 아침 이메일로 관련 뉴스 3건을 보냅니다. 정치·부동산 기사는 보내지 않습니다.</p>
+          <div class="news-cats">
+            <label class="news-cat"><input id="newsGold" type="checkbox" value="gold"/> Gold</label>
+            <label class="news-cat"><input id="newsStock" type="checkbox" value="stock"/> Stock</label>
+            <label class="news-cat"><input id="newsBitcoin" type="checkbox" value="bitcoin"/> Bitcoin</label>
+          </div>
+          <label for="newsKeywords">키워드 (선택)</label>
+          <input id="newsKeywords" autocomplete="off" placeholder="예: 하이닉스, 연준"/>
+          <p class="hint">키워드를 적으면 그 단어가 들어간 뉴스만 받습니다. 비우면 고른 카테고리 전체를 대상으로 합니다.</p>
+          <div class="err" id="newsErr"></div>
+          <div class="ok" id="newsOk"></div>
+          <button class="primary" id="newsApplyBtn" type="button">신청</button>
+          <button class="ghost" id="newsStopBtn" type="button">수신 중단</button>
+        </div>
       </div>
     </section>
   </div>
@@ -647,6 +691,9 @@
     const ADS_API = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/data/ted_ads.json";
     const ADS_RAW = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ted_ads.json";
     const ADS_KEY = "ted_ads";
+    const NEWS_API = "https://api.github.com/repos/Hwang-gu/macro-invest-monitor/contents/data/ted_newsletters.json";
+    const NEWS_RAW = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ted_newsletters.json";
+    const NEWS_KEY = "ted_newsletters";
     const AD_IMAGE_BASE = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ads/";
     const AD_SPEC = "원본 비율 그대로 저장됩니다<br/>권장: 가로 긴 배너 · JPG 또는 PNG<br/>여기를 누르거나 아래 사진 선택";
     let sharedUsers = [];
@@ -1263,6 +1310,124 @@
       $("adModal").classList.remove("hidden");
     }
 
+    const NEWS_CATS = ["gold", "stock", "bitcoin"];
+    function normalizeNewsletters(data) {
+      const out = {};
+      if (!data || typeof data !== "object" || Array.isArray(data)) return out;
+      Object.keys(data).forEach((key) => {
+        const email = String(key || "").trim().toLowerCase();
+        const row = data[key];
+        if (!email || !row || typeof row !== "object") return;
+        const cats = (Array.isArray(row.categories) ? row.categories : [])
+          .map((c) => String(c || "").toLowerCase())
+          .filter((c) => NEWS_CATS.indexOf(c) >= 0);
+        let keywords = [];
+        if (Array.isArray(row.keywords)) {
+          keywords = row.keywords.map((s) => String(s || "").trim()).filter(Boolean);
+        } else {
+          keywords = String(row.keywords || "").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+        }
+        out[email] = {
+          categories: Array.from(new Set(cats)),
+          keywords,
+          active: row.active !== false,
+          updated: Number(row.updated) || 0
+        };
+      });
+      return out;
+    }
+    function localNewsletters() {
+      try { return normalizeNewsletters(JSON.parse(localStorage.getItem(NEWS_KEY) || "null")); }
+      catch { return {}; }
+    }
+    let newsletters = normalizeNewsletters(BOOT.newsletters);
+    if (!Object.keys(newsletters).length) newsletters = localNewsletters();
+    function newsEmail() {
+      return currentUser ? String(currentUser.id || "").trim().toLowerCase() : "";
+    }
+    function parseNewsKeywords() {
+      return String($("newsKeywords").value || "").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    }
+    function selectedNewsCats() {
+      return NEWS_CATS.filter((c) => {
+        const el = c === "gold" ? $("newsGold") : c === "stock" ? $("newsStock") : $("newsBitcoin");
+        return el && el.checked;
+      });
+    }
+    function fillNewsForm() {
+      const row = newsletters[newsEmail()] || { categories: [], keywords: [], active: false };
+      $("newsGold").checked = row.categories.indexOf("gold") >= 0;
+      $("newsStock").checked = row.categories.indexOf("stock") >= 0;
+      $("newsBitcoin").checked = row.categories.indexOf("bitcoin") >= 0;
+      $("newsKeywords").value = (row.keywords || []).join(", ");
+      $("newsErr").textContent = "";
+      $("newsOk").textContent = row.active ? "현재 수신 중입니다." : "";
+    }
+    async function loadNewsJson(url, headers) {
+      const r = await fetch(url, { cache: "no-store", headers: headers || {} });
+      if (!r.ok) return null;
+      const data = await r.json();
+      if (data && typeof data.content === "string") return JSON.parse(b64ToUtf8(data.content));
+      return data;
+    }
+    async function refreshNewsletters() {
+      const tries = [
+        () => loadNewsJson(NEWS_API + "?t=" + Date.now(), { Accept: "application/vnd.github+json" }),
+        () => loadNewsJson(NEWS_RAW + "?t=" + Date.now()),
+        () => loadNewsJson("newsletters.json?t=" + Date.now())
+      ];
+      for (const load of tries) {
+        try {
+          const data = await load();
+          if (!data) continue;
+          newsletters = normalizeNewsletters(data);
+          localStorage.setItem(NEWS_KEY, JSON.stringify(newsletters));
+          fillNewsForm();
+          return;
+        } catch {}
+      }
+      fillNewsForm();
+    }
+    async function saveNewsletters(next) {
+      newsletters = normalizeNewsletters(next);
+      localStorage.setItem(NEWS_KEY, JSON.stringify(newsletters));
+      return githubPutJson("data/ted_newsletters.json", "update ted newsletters", newsletters);
+    }
+    async function applyNewsletter(active) {
+      $("newsErr").textContent = "";
+      $("newsOk").textContent = "";
+      const email = newsEmail();
+      if (!email) {
+        $("newsErr").textContent = "로그인 후 신청해 주세요.";
+        return;
+      }
+      const categories = selectedNewsCats();
+      const keywords = parseNewsKeywords();
+      if (active && !categories.length) {
+        $("newsErr").textContent = "Gold, Stock, Bitcoin 중 하나 이상 골라 주세요.";
+        return;
+      }
+      const prev = newsletters[email] || { categories: [], keywords: [] };
+      const row = {
+        categories: active ? categories : (categories.length ? categories : prev.categories),
+        keywords: active ? keywords : (keywords.length ? keywords : prev.keywords),
+        active: !!active,
+        updated: Date.now()
+      };
+      const next = Object.assign({}, newsletters, { [email]: row });
+      let synced = false;
+      try { synced = await saveNewsletters(next); }
+      catch { $("newsErr").textContent = "저장하지 못했습니다."; return; }
+      fillNewsForm();
+      if (!synced) {
+        $("newsErr").textContent = "이 기기에는 저장했습니다. 메일 발송에 반영하려면 비밀번호로 다시 로그인해 주세요.";
+        return;
+      }
+      $("newsOk").textContent = active
+        ? "신청했습니다. 평일 아침 로그인 ID로 메일이 갑니다."
+        : "수신을 중단했습니다.";
+    }
+
     function show(id) {
       $("login").classList.toggle("hidden", id !== "login");
       $("app").classList.toggle("hidden", id !== "app");
@@ -1765,7 +1930,7 @@
     }
 
     function showHome() {
-      ["past","present","future"].forEach(t => $(t).classList.add("hidden"));
+      ["past","present","future","news"].forEach(t => $(t).classList.add("hidden"));
       document.querySelectorAll(".menus button").forEach(b => b.classList.remove("on"));
       $("app").classList.add("home");
     }
@@ -1838,7 +2003,7 @@
         return;
       }
       $("app").classList.remove("home");
-      ["past","present","future"].forEach(t => $(t).classList.toggle("hidden", t !== name));
+      ["past","present","future","news"].forEach(t => $(t).classList.toggle("hidden", t !== name));
       document.querySelectorAll(".menus button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
       if (name === "past") setTimeout(drawPast, 80);
       if (name === "present") {
@@ -1847,6 +2012,7 @@
           if (selectedPresent) showPresentDate(selectedPresent);
         });
       }
+      if (name === "news") fillNewsForm();
     }
 
     function resizePast() {
@@ -1878,6 +2044,7 @@
       showHome();
       renderAdBanners();
       refreshAds();
+      refreshNewsletters();
     }
 
     $("loginBtn").onclick = async () => {
@@ -2061,6 +2228,8 @@
     $("closeAdmin").onclick = () => $("adminModal").classList.add("hidden");
     $("adminModal").onclick = (e) => { if (e.target.id === "adminModal") $("adminModal").classList.add("hidden"); };
     document.querySelectorAll(".menus button").forEach(b => b.onclick = () => openTab(b.dataset.tab));
+    $("newsApplyBtn").onclick = () => applyNewsletter(true);
+    $("newsStopBtn").onclick = () => applyNewsletter(false);
     $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
     $("uid").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
     $("newUserPw").addEventListener("keydown", e => { if (e.key === "Enter") $("addUserBtn").click(); });
@@ -2095,7 +2264,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=25");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=26");
   </script>
 </body>
 </html>
