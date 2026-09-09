@@ -341,13 +341,6 @@
     .ad-place-actions { display: flex; gap: 8px; }
     .ad-place-actions button { flex: 1; margin-top: 10px; }
     .news-form { max-width: 420px; }
-    .news-form h3 {
-      margin: 0 0 10px;
-      font-size: 1rem;
-      font-weight: normal;
-      letter-spacing: .06em;
-      text-align: center;
-    }
     .news-cats { display: flex; flex-direction: column; gap: 16px; margin: 8px 0 16px; }
     .news-cat-block {
       display: flex;
@@ -584,7 +577,6 @@
       </div>
       <div id="news" class="panel hidden">
         <div class="news-form">
-          <h3>Apply for news letter</h3>
           <div class="news-cats">
             <div class="news-cat-block">
               <label class="news-cat"><input id="newsGold" type="checkbox" value="gold"/> Gold</label>
@@ -2333,7 +2325,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=28");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=29");
   </script>
 </body>
 </html>
