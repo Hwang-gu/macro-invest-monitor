@@ -226,15 +226,17 @@
     .modal.form { text-align: left; }
     .modal.form h2 { text-align: center; font-size: 1.05rem; letter-spacing: .08em; margin-bottom: 8px; }
     .weights div, .user-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1c2a44; }
-    .user-row { font-size: .82rem; gap: 8px; }
+    .user-row { font-size: .82rem; gap: 8px; flex-wrap: wrap; }
     .user-row > span:first-child {
+      flex: 1 1 120px;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       color: #d7dee8;
     }
-    .user-row button { width: auto; padding: 6px 10px; font-size: .82rem; margin: 0; }
-    .user-row .row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .user-row button { width: auto; padding: 6px 10px; font-size: .78rem; margin: 0; }
+    .user-row .row-actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: auto; }
+    #userModal .modal.form { max-height: min(88vh, 720px); overflow: auto; }
     .pw-wrap { position: relative; }
     .pw-wrap input { padding-right: 52px; width: 100%; }
     .pw-toggle {
@@ -711,6 +713,8 @@
     const AD_IMAGE_BASE = "https://raw.githubusercontent.com/Hwang-gu/macro-invest-monitor/main/data/ads/";
     const AD_SPEC = "원본 비율 그대로 저장됩니다<br/>권장: 가로 긴 배너 · JPG 또는 PNG<br/>여기를 누르거나 아래 사진 선택";
     let sharedUsers = [];
+    let sharedLoaded = false;
+    let usersTouched = false;
     let currentUser = null;
     let pwTarget = null;
     let writeToken = "";
@@ -768,6 +772,7 @@
       catch { return []; }
     }
     function saveExtraUsers(list) {
+      usersTouched = true;
       localStorage.setItem(EXTRA_KEY, JSON.stringify(list));
     }
     function validHash(h) {
@@ -794,18 +799,29 @@
       if (a.wrap && a.wrap.ct) row.wrap = a.wrap;
       if (!prev || row.updated >= Number(prev.updated || 0)) map.set(key, row);
     }
-    function allAuth() {
-      const byId = new Map();
-      (BOOT.auth || []).forEach(a => upsertAccount(byId, a));
+    function mergeLiveUsers(byId) {
+      if (usersTouched) {
+        extraUsers().forEach(a => upsertAccount(byId, a));
+        return;
+      }
+      if (sharedLoaded) {
+        sharedUsers.forEach(a => upsertAccount(byId, a));
+        return;
+      }
       extraUsers().forEach(a => upsertAccount(byId, a));
       sharedUsers.forEach(a => upsertAccount(byId, a));
+      (BOOT.auth || []).filter(a => a.role === "User" && a.source !== "env").forEach(a => upsertAccount(byId, a));
+    }
+    function allAuth() {
+      const byId = new Map();
+      (BOOT.auth || []).filter(a => a.source === "env" || a.role === "Manager").forEach(a => upsertAccount(byId, a));
+      mergeLiveUsers(byId);
       return [...byId.values()];
     }
     function userStore() {
       const byId = new Map();
-      (BOOT.auth || []).filter(a => a.role === "User").forEach(a => upsertAccount(byId, a));
-      extraUsers().forEach(a => upsertAccount(byId, a));
-      sharedUsers.forEach(a => upsertAccount(byId, a));
+      (BOOT.auth || []).filter(a => a.role === "User" && a.source === "env").forEach(a => upsertAccount(byId, a));
+      mergeLiveUsers(byId);
       return [...byId.values()].filter(a => a.role === "User");
     }
     function mutableUsers() {
@@ -994,6 +1010,7 @@
       const rows = list.filter(validUser).map(a => toUserRow(Object.assign({}, a, { updated: Number(a.updated || Date.now()) })));
       saveExtraUsers(rows);
       sharedUsers = rows.slice();
+      sharedLoaded = true;
       return githubSaveUsers(rows);
     }
     function b64ToUtf8(b64) {
@@ -1018,6 +1035,7 @@
           const data = await load();
           if (!data) continue;
           sharedUsers = (Array.isArray(data) ? data : []).filter(validUser).map(toUserRow);
+          sharedLoaded = true;
           return;
         } catch {}
       }
@@ -1060,9 +1078,28 @@
         btn.onclick = async () => {
           const row = store[Number(btn.dataset.del)];
           if (!row) return;
+          $("userErr").textContent = "";
+          $("userOk").textContent = "";
+          btn.disabled = true;
           const key = String(row.id).toLowerCase();
-          await saveUserStore(mutableUsers().filter(a => String(a.id).toLowerCase() !== key));
+          let synced = false;
+          try {
+            synced = await saveUserStore(mutableUsers().filter(a => String(a.id).toLowerCase() !== key));
+          } catch {
+            $("userErr").textContent = "삭제하지 못했습니다.";
+            btn.disabled = false;
+            return;
+          }
+          if (newsletters[key]) {
+            const nextNews = Object.assign({}, newsletters);
+            delete nextNews[key];
+            try { await saveNewsletters(nextNews); }
+            catch {}
+          }
           renderUsers();
+          $("userOk").textContent = synced
+            ? "삭제했습니다."
+            : "이 기기에서는 지웠습니다. 다른 기기에도 맞추려면 매니저로 다시 로그인해 주세요.";
         };
       });
       $("userList").querySelectorAll("[data-pw]").forEach(btn => {
@@ -2296,7 +2333,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=27");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=28");
   </script>
 </body>
 </html>
