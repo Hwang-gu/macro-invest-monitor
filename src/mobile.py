@@ -169,10 +169,20 @@ def _load_newsletters() -> dict[str, Any]:
             name = str(cat or "").strip().lower()
             if name in allowed and name not in categories:
                 categories.append(name)
-        if isinstance(row.get("keywords"), list):
-            keywords = [str(s).strip() for s in row["keywords"] if str(s).strip()]
+        if isinstance(row.get("keywords"), dict):
+            keywords = {}
+            for cat in ("gold", "stock", "bitcoin"):
+                raw = row["keywords"].get(cat)
+                if isinstance(raw, list):
+                    keywords[cat] = [str(s).strip() for s in raw if str(s).strip()]
+                else:
+                    keywords[cat] = [s.strip() for s in str(raw or "").replace("，", ",").split(",") if s.strip()]
+        elif isinstance(row.get("keywords"), list):
+            shared = [str(s).strip() for s in row["keywords"] if str(s).strip()]
+            keywords = {cat: list(shared) if cat in categories else [] for cat in ("gold", "stock", "bitcoin")}
         else:
-            keywords = [s.strip() for s in str(row.get("keywords") or "").replace("，", ",").split(",") if s.strip()]
+            shared = [s.strip() for s in str(row.get("keywords") or "").replace("，", ",").split(",") if s.strip()]
+            keywords = {cat: list(shared) if cat in categories else [] for cat in ("gold", "stock", "bitcoin")}
         out[email] = {
             "categories": categories,
             "keywords": keywords,

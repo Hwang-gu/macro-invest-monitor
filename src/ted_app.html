@@ -346,7 +346,12 @@
       letter-spacing: .06em;
       text-align: center;
     }
-    .news-cats { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 16px; }
+    .news-cats { display: flex; flex-direction: column; gap: 16px; margin: 8px 0 16px; }
+    .news-cat-block {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
     .news-cat {
       display: flex; align-items: center; gap: 10px;
       margin: 0; font-size: 1rem; color: #fff;
@@ -355,8 +360,9 @@
       width: 18px; height: 18px; padding: 0; margin: 0;
       accent-color: #6ea2e6;
     }
+    .news-kw-label { margin: 8px 0 6px; }
     .news-form button.primary { margin-top: 12px; }
-    .news-form button.ghost { margin-top: 8px; }
+    .news-form button.ghost { margin-top: 8px; white-space: normal; line-height: 1.25; }
 
     @media (min-width: 960px) {
       html, body { height: 100%; }
@@ -577,19 +583,27 @@
       <div id="news" class="panel hidden">
         <div class="news-form">
           <h3>Apply for news letter</h3>
-          <p class="hint">원하는 카테고리를 고르면 평일 아침 이메일로 관련 뉴스 3건을 보냅니다. 정치·부동산 기사는 보내지 않습니다.</p>
           <div class="news-cats">
-            <label class="news-cat"><input id="newsGold" type="checkbox" value="gold"/> Gold</label>
-            <label class="news-cat"><input id="newsStock" type="checkbox" value="stock"/> Stock</label>
-            <label class="news-cat"><input id="newsBitcoin" type="checkbox" value="bitcoin"/> Bitcoin</label>
+            <div class="news-cat-block">
+              <label class="news-cat"><input id="newsGold" type="checkbox" value="gold"/> Gold</label>
+              <label class="news-kw-label" for="newsKwGold">Keyword</label>
+              <input id="newsKwGold" autocomplete="off" placeholder="Ex. 하이닉스, 펩트론 임상"/>
+            </div>
+            <div class="news-cat-block">
+              <label class="news-cat"><input id="newsStock" type="checkbox" value="stock"/> Stock</label>
+              <label class="news-kw-label" for="newsKwStock">Keyword</label>
+              <input id="newsKwStock" autocomplete="off" placeholder="Ex. 하이닉스, 펩트론 임상"/>
+            </div>
+            <div class="news-cat-block">
+              <label class="news-cat"><input id="newsBitcoin" type="checkbox" value="bitcoin"/> Bitcoin</label>
+              <label class="news-kw-label" for="newsKwBitcoin">Keyword</label>
+              <input id="newsKwBitcoin" autocomplete="off" placeholder="Ex. 하이닉스, 펩트론 임상"/>
+            </div>
           </div>
-          <label for="newsKeywords">키워드 (선택)</label>
-          <input id="newsKeywords" autocomplete="off" placeholder="예: 하이닉스, 연준"/>
-          <p class="hint">키워드를 적으면 그 단어가 들어간 뉴스만 받습니다. 비우면 고른 카테고리 전체를 대상으로 합니다.</p>
           <div class="err" id="newsErr"></div>
           <div class="ok" id="newsOk"></div>
-          <button class="primary" id="newsApplyBtn" type="button">신청</button>
-          <button class="ghost" id="newsStopBtn" type="button">수신 중단</button>
+          <button class="primary" id="newsApplyBtn" type="button">Apply</button>
+          <button class="ghost" id="newsStopBtn" type="button">Receive interuption</button>
         </div>
       </div>
     </section>
@@ -1311,6 +1325,27 @@
     }
 
     const NEWS_CATS = ["gold", "stock", "bitcoin"];
+    const NEWS_KW_IDS = { gold: "newsKwGold", stock: "newsKwStock", bitcoin: "newsKwBitcoin" };
+    const NEWS_CHECK_IDS = { gold: "newsGold", stock: "newsStock", bitcoin: "newsBitcoin" };
+    function parseKeywordList(value) {
+      if (Array.isArray(value)) return value.map((s) => String(s || "").trim()).filter(Boolean);
+      return String(value || "").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    }
+    function emptyNewsKeywords() {
+      const out = {};
+      NEWS_CATS.forEach((c) => { out[c] = []; });
+      return out;
+    }
+    function normalizeNewsKeywords(raw, categories) {
+      const out = emptyNewsKeywords();
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        NEWS_CATS.forEach((c) => { out[c] = parseKeywordList(raw[c]); });
+        return out;
+      }
+      const shared = parseKeywordList(raw);
+      (categories || []).forEach((c) => { if (out[c]) out[c] = shared.slice(); });
+      return out;
+    }
     function normalizeNewsletters(data) {
       const out = {};
       if (!data || typeof data !== "object" || Array.isArray(data)) return out;
@@ -1321,15 +1356,9 @@
         const cats = (Array.isArray(row.categories) ? row.categories : [])
           .map((c) => String(c || "").toLowerCase())
           .filter((c) => NEWS_CATS.indexOf(c) >= 0);
-        let keywords = [];
-        if (Array.isArray(row.keywords)) {
-          keywords = row.keywords.map((s) => String(s || "").trim()).filter(Boolean);
-        } else {
-          keywords = String(row.keywords || "").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-        }
         out[email] = {
           categories: Array.from(new Set(cats)),
-          keywords,
+          keywords: normalizeNewsKeywords(row.keywords, cats),
           active: row.active !== false,
           updated: Number(row.updated) || 0
         };
@@ -1345,21 +1374,24 @@
     function newsEmail() {
       return currentUser ? String(currentUser.id || "").trim().toLowerCase() : "";
     }
-    function parseNewsKeywords() {
-      return String($("newsKeywords").value || "").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-    }
     function selectedNewsCats() {
       return NEWS_CATS.filter((c) => {
-        const el = c === "gold" ? $("newsGold") : c === "stock" ? $("newsStock") : $("newsBitcoin");
+        const el = $(NEWS_CHECK_IDS[c]);
         return el && el.checked;
       });
     }
+    function readNewsKeywords() {
+      const out = emptyNewsKeywords();
+      NEWS_CATS.forEach((c) => { out[c] = parseKeywordList($(NEWS_KW_IDS[c]).value); });
+      return out;
+    }
     function fillNewsForm() {
-      const row = newsletters[newsEmail()] || { categories: [], keywords: [], active: false };
-      $("newsGold").checked = row.categories.indexOf("gold") >= 0;
-      $("newsStock").checked = row.categories.indexOf("stock") >= 0;
-      $("newsBitcoin").checked = row.categories.indexOf("bitcoin") >= 0;
-      $("newsKeywords").value = (row.keywords || []).join(", ");
+      const row = newsletters[newsEmail()] || { categories: [], keywords: emptyNewsKeywords(), active: false };
+      const keywords = normalizeNewsKeywords(row.keywords, row.categories);
+      NEWS_CATS.forEach((c) => {
+        $(NEWS_CHECK_IDS[c]).checked = row.categories.indexOf(c) >= 0;
+        $(NEWS_KW_IDS[c]).value = (keywords[c] || []).join(", ");
+      });
       $("newsErr").textContent = "";
       $("newsOk").textContent = row.active ? "현재 수신 중입니다." : "";
     }
@@ -1402,15 +1434,15 @@
         return;
       }
       const categories = selectedNewsCats();
-      const keywords = parseNewsKeywords();
+      const keywords = readNewsKeywords();
       if (active && !categories.length) {
         $("newsErr").textContent = "Gold, Stock, Bitcoin 중 하나 이상 골라 주세요.";
         return;
       }
-      const prev = newsletters[email] || { categories: [], keywords: [] };
+      const prev = newsletters[email] || { categories: [], keywords: emptyNewsKeywords() };
       const row = {
         categories: active ? categories : (categories.length ? categories : prev.categories),
-        keywords: active ? keywords : (keywords.length ? keywords : prev.keywords),
+        keywords,
         active: !!active,
         updated: Date.now()
       };
@@ -2264,7 +2296,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=26");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=27");
   </script>
 </body>
 </html>
