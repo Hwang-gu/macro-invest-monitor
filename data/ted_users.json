@@ -95,5 +95,18 @@
       "iv": "HT0D12beTmYP8asn",
       "ct": "vPsjcvKDoE0ej3VUqZOs0AMVJfQmjZTUsOLoLhSzRyQBQ1SCgOzdqqj5HvPPRTeqACt3bBzPYCCvYbPq3nQa98+ymTYKMFLj7iNmMsAftAklxQoTujYyFE696UipzsTsFaaPLF+OZ3r1AOUsTg=="
     }
+  },
+  {
+    "role": "User",
+    "id": "doggyproddy@naver.com",
+    "hash": "113443b4e99767af29df5d2c8a61d880c61bb53f3e4ddb2088d084d5d48750c8",
+    "updated": 1789189828405,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "hqGS+pNElYWo7Q93B+Ah2g==",
+      "iv": "+hgukVV3sxriBVbZ",
+      "ct": "HVXbqYxnQUscCrA/YGP7cKrcSml6K1z42qqbo3nIMCqIbcardRStb1CWSvI77DuPkooOzezMjYOfNJCiBCNaM6DgdBxuAJDgZ2Z6DohD182uCINocecPqJso9gRvUVYsQnQgra2E4XNK21rwMA=="
+    }
   }
 ]
