@@ -108,5 +108,18 @@
       "iv": "+hgukVV3sxriBVbZ",
       "ct": "HVXbqYxnQUscCrA/YGP7cKrcSml6K1z42qqbo3nIMCqIbcardRStb1CWSvI77DuPkooOzezMjYOfNJCiBCNaM6DgdBxuAJDgZ2Z6DohD182uCINocecPqJso9gRvUVYsQnQgra2E4XNK21rwMA=="
     }
+  },
+  {
+    "role": "User",
+    "id": "guq0508@naver.com",
+    "hash": "dee53674495cdabb6b5d1b10b33309a66e85f301960284ece2c69a45844c4c76",
+    "updated": 1789189843872,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "Kqbm982c61tHQkYtquii2A==",
+      "iv": "hu/oOkuaVvsU6IIr",
+      "ct": "6OKEcf9Wa8au5iE/UBBJ/Zu5UcRaZ0QDcpUWJvKLkz3y6b4r2trTRDtuDeZwmQK46QZt8FWmoHodvPrkrdEn7EaT9yfOQ2EAfCejyLi9BK7wiyinOuQ18xIPItR+Z5ZOXHdF09/Z0O0vJ9nQrQ=="
+    }
   }
 ]
