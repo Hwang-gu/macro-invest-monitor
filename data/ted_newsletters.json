@@ -16,7 +16,8 @@
   },
   "doggyproddy@naver.com": {
     "categories": [
-      "stock"
+      "stock",
+      "bitcoin"
     ],
     "keywords": {
       "gold": [],
@@ -24,6 +25,6 @@
       "bitcoin": []
     },
     "active": true,
-    "updated": 1789189977234
+    "updated": 1789189985195
   }
 }
