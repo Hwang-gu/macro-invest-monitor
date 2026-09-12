@@ -14,17 +14,14 @@
     "active": true,
     "updated": 1788972931811
   },
-  "doggyproddy@naver.com": {
-    "categories": [
-      "stock",
-      "bitcoin"
-    ],
+  "guq0508@naver.com": {
+    "categories": [],
     "keywords": {
       "gold": [],
       "stock": [],
       "bitcoin": []
     },
-    "active": true,
-    "updated": 1789189985195
+    "active": false,
+    "updated": 1789190035153
   }
 }
