@@ -69,5 +69,18 @@
       "iv": "Ee9ipNT8FctB+7oN",
       "ct": "ORby6rXnMV3R+cc47O9lUbFI+uaeyTYZEFeulxTv1wubIFHYn2pR22KcBidN8I+cH/HZVdqw6TIdmMatuIUKx2K4MKtfLy0D4kTqWX0iJMDoEtb6uLUqQYaJ1H690StTREzI3egS7YlQxvZMrQ=="
     }
+  },
+  {
+    "role": "User",
+    "id": "hkm04051000@gmail.com",
+    "hash": "b845e1c0d8bba3d9b0825dd04183350c11adea0a1dadb884b11cdf7c7d420f74",
+    "updated": 1789189272851,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "mDokxC1AySXP/eMnC2hkpQ==",
+      "iv": "CDbZbVqsYJg1NiZ5",
+      "ct": "6szhASDjwmjCergiL2HTvzrMjm2FzKQkFieYyFmjQZFZ3SyM8EiQbo15qjOta1OwxBWx+0nUpNCrY8ZQXojDQ9u1TLb9ZMdsS2AItUXKzpl7DLQcVv/L1G7uQNs5peTYXB+l3burUBPA2hoWWg=="
+    }
   }
 ]
