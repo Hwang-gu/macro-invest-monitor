@@ -203,6 +203,7 @@ CHART_KEYS = (
     "us_ffr",
     "kr_call",
     "usdkkrw",
+    "usdjpy",
     "kospi",
     "kosdaq",
     "nasdaq",
@@ -215,6 +216,7 @@ CHART_DIGITS = {
     "us_ffr": 3,
     "kr_call": 3,
     "usdkkrw": 2,
+    "usdjpy": 2,
     "kospi": 2,
     "kosdaq": 2,
     "nasdaq": 2,
@@ -271,6 +273,25 @@ def _weights(scores: dict[str, float] | None) -> dict[str, float]:
 
 
 _ASOF_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_BOOT_RE = re.compile(
+    r'<script type="application/json" id="boot">(.*?)</script>',
+    re.S,
+)
+
+
+def _existing_boot() -> dict[str, Any] | None:
+    path = APP_DIR / "index.html"
+    if not path.exists():
+        return None
+    match = _BOOT_RE.search(path.read_text(encoding="utf-8"))
+    if not match:
+        return None
+    raw = match.group(1).replace("<\\/", "</")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _asof_key(value: Any) -> str:
@@ -376,6 +397,7 @@ def write_mobile_app(
     seasonal = _seasonal_note(panel, str(report.get("asof"))) if panel is not None else {}
     extra_users = _extra_user_records()
     token = os.getenv("TED_SYNC_TOKEN", "").strip()
+    prev = _existing_boot() or {}
     horizon_views: list[dict[str, Any]] = []
     if bundle is not None and features is not None and panel is not None:
         from .model import allocate
@@ -390,13 +412,20 @@ def write_mobile_app(
                 "weights": _weights(r.get("asset_scores")),
             })
     if not horizon_views:
-        horizon_views.append({
-            "id": "1M",
-            "label": "1개월",
-            "days": int(report.get("horizon_days") or 21),
-            "future": future_briefing(report, seasonal),
-            "weights": _weights(report.get("asset_scores")),
-        })
+        prev_views = prev.get("futureHorizons")
+        if isinstance(prev_views, list) and prev_views:
+            horizon_views = prev_views
+        else:
+            horizon_views.append({
+                "id": "1M",
+                "label": "1개월",
+                "days": int(report.get("horizon_days") or 21),
+                "future": future_briefing(report, seasonal),
+                "weights": _weights(report.get("asset_scores")),
+            })
+    present = present_briefing(report, channels)
+    if channels is None and isinstance(prev.get("present"), dict) and prev["present"]:
+        present = prev["present"]
     default_view = next((v for v in horizon_views if v["id"] == "1M"), horizon_views[0])
     boot = {
         "asof": report.get("asof"),
@@ -412,7 +441,7 @@ def write_mobile_app(
         + extra_users,
         "chart": _chart_bundle(panel) if panel is not None else {"dates": []},
         "events": _events_payload(),
-        "present": present_briefing(report, channels),
+        "present": present,
         "future": default_view["future"],
         "weights": default_view["weights"],
         "futureHorizons": horizon_views,

@@ -104,9 +104,30 @@
     }
     #app.home .menus {
       flex: 1;
-      justify-content: center;
-      margin: 0;
+      justify-content: flex-start;
+      margin: 4px 0 0;
     }
+    .home-quotes {
+      display: none;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin: 0 0 20px;
+      padding: 10px;
+      border: 1px solid #1c2a44;
+      border-radius: 12px;
+      background: #10192b;
+    }
+    #app.home .home-quotes { display: grid; }
+    .home-quotes .q { min-width: 0; padding: 6px 4px; }
+    .home-quotes .name {
+      color: #b7c3d4; font-size: .68rem; letter-spacing: .02em; margin-bottom: 4px;
+    }
+    .home-quotes .px { font-size: .92rem; font-variant-numeric: tabular-nums; }
+    .home-quotes .chg {
+      font-size: .68rem; margin-top: 3px; font-variant-numeric: tabular-nums; min-height: 1em;
+    }
+    .home-quotes .chg.up { color: #ef4444; }
+    .home-quotes .chg.down { color: #60a5fa; }
     .menus { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
     .menus button { text-align: center; letter-spacing: .16em; }
     .menus button[data-tab="news"] { letter-spacing: .06em; font-size: .92rem; white-space: normal; line-height: 1.25; }
@@ -449,16 +470,21 @@
         min-height: 0;
         height: auto;
       }
+      #app.home .home-quotes {
+        max-width: 420px;
+        width: 100%;
+        margin: 0 auto 16px;
+      }
       #app.home .menus {
         flex-direction: column;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         max-width: 280px;
         width: 100%;
         margin-left: auto;
         margin-right: auto;
         gap: 36px;
-        padding: 40px 0 56px;
+        padding: 8px 0 56px;
       }
       #app.home .menus button {
         width: 100%;
@@ -567,6 +593,7 @@
           <button class="ghost" id="pwChangeBtn" type="button">비밀번호 변경</button>
         </div>
       </div>
+      <div class="home-quotes" id="homeQuotes" aria-label="Market quotes"></div>
       <nav class="menus">
         <button type="button" data-tab="past">Past</button>
         <button type="button" data-tab="present">Present</button>
@@ -1905,6 +1932,41 @@
       if (abs >= 10) return v.toFixed(2);
       return v.toFixed(3);
     }
+    const HOME_QUOTES = [
+      {key: "usdkkrw", name: "USD/KRW"},
+      {key: "usdjpy", name: "USD/JPY"},
+      {key: "kospi", name: "KOSPI"},
+      {key: "kosdaq", name: "KOSDAQ"},
+      {key: "nasdaq", name: "NASDAQ"},
+      {key: "dow", name: "Dow Jones"}
+    ];
+    function lastPair(key) {
+      const a = CHART[key] || [];
+      let last = null, prev = null;
+      for (let i = a.length - 1; i >= 0; i--) {
+        const v = a[i];
+        if (v == null || v !== v) continue;
+        if (last == null) last = v;
+        else { prev = v; break; }
+      }
+      return {last, prev};
+    }
+    function fmtChg(last, prev) {
+      if (last == null || prev == null || !prev) return {text: "", cls: ""};
+      const pct = (last / prev - 1) * 100;
+      const cls = pct > 0 ? "up" : pct < 0 ? "down" : "";
+      const sign = pct > 0 ? "+" : "";
+      return {text: sign + pct.toFixed(2) + "%", cls};
+    }
+    function renderHomeQuotes() {
+      const box = $("homeQuotes");
+      if (!box) return;
+      box.innerHTML = HOME_QUOTES.map(q => {
+        const {last, prev} = lastPair(q.key);
+        const chg = fmtChg(last, prev);
+        return `<div class="q"><div class="name">${q.name}</div><div class="px">${fmtNum(last)}</div><div class="chg ${chg.cls}">${chg.text}</div></div>`;
+      }).join("");
+    }
     function lwData(arr) {
       return (CHART.dates || []).map((d, i) => {
         const v = arr[i];
@@ -2198,6 +2260,7 @@
       ["past","present","future","news"].forEach(t => $(t).classList.add("hidden"));
       document.querySelectorAll(".menus button").forEach(b => b.classList.remove("on"));
       $("app").classList.add("home");
+      renderHomeQuotes();
     }
 
     async function loadPresentDates() {
@@ -2536,7 +2599,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=33");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=34");
   </script>
 </body>
 </html>
