@@ -396,7 +396,19 @@
     .news-admin-status { color: #9ad0a8; font-size: .74rem; margin-top: 4px; }
     .news-admin-status.off { color: #b7c3d4; }
     .news-admin-kw { color: #b7c3d4; font-size: .74rem; margin-top: 6px; line-height: 1.45; }
-    .news-admin-cat { color: #9ad0ff; margin-right: 6px; }
+    .news-mine {
+      margin: 0 0 18px;
+      padding: 12px;
+      border: 1px solid #2d5a9a;
+      border-radius: 12px;
+      background: #10192b;
+    }
+    .news-mine h3 {
+      margin: 0 0 8px;
+      font-size: .88rem;
+      font-weight: normal;
+      letter-spacing: .06em;
+    }
 
     @media (min-width: 960px) {
       html, body { height: 100%; }
@@ -620,6 +632,10 @@
           <div id="newsAdminList"></div>
         </div>
         <div class="news-form">
+          <div id="newsMine" class="news-mine">
+            <h3>My subscription</h3>
+            <div id="newsMineList"></div>
+          </div>
           <div class="news-cats">
             <div class="news-cat-block">
               <label class="news-cat"><input id="newsGold" type="checkbox" value="gold"/> Gold</label>
@@ -655,6 +671,13 @@
     <div class="modal">
       <p>Manager : tedhyun25@naver.com</p>
       <button class="primary" id="closeAdmin" type="button">닫기</button>
+    </div>
+  </div>
+
+  <div id="newsKwModal" class="modal-bg hidden">
+    <div class="modal">
+      <p>Please enter some keywords</p>
+      <button class="primary" id="closeNewsKw" type="button">OK</button>
     </div>
   </div>
 
@@ -1545,8 +1568,23 @@
         $(NEWS_KW_IDS[c]).value = (keywords[c] || []).join(", ");
       });
       $("newsErr").textContent = "";
-      $("newsOk").textContent = row.active ? "현재 수신 중입니다." : "";
+      $("newsOk").textContent = "";
+      renderNewsMine();
       renderNewsAdmin();
+    }
+    function renderNewsMine() {
+      const list = $("newsMineList");
+      if (!list) return;
+      const row = newsletters[newsEmail()] || { categories: [], keywords: emptyNewsKeywords(), active: false };
+      const active = !!row.active && (row.categories || []).some((c) => NEWS_CATS.indexOf(c) >= 0);
+      const status = active ? "수신 중" : "구독 중이 아닙니다.";
+      const lines = NEWS_CATS.map((c) => {
+        if ((row.categories || []).indexOf(c) < 0) return "";
+        const words = (row.keywords && row.keywords[c]) || [];
+        return `<div><span class="news-admin-cat">${NEWS_LABELS[c]}</span>${escapeHtml(words.join(", ") || "-")}</div>`;
+      }).filter(Boolean).join("");
+      list.innerHTML = `<div class="news-admin-status ${active ? "on" : "off"}">${status}</div>`
+        + (active && lines ? `<div class="news-admin-kw">${lines}</div>` : "");
     }
     function renderNewsAdmin() {
       const box = $("newsAdmin");
@@ -1622,8 +1660,8 @@
         $("newsErr").textContent = "Gold, Stock, Bitcoin, Others 중 하나 이상 골라 주세요.";
         return;
       }
-      if (active && categories.indexOf("others") >= 0 && !(keywords.others || []).length) {
-        $("newsErr").textContent = "Others는 키워드를 입력해 주세요.";
+      if (active && categories.some((c) => !(keywords[c] || []).length)) {
+        $("newsKwModal").classList.remove("hidden");
         return;
       }
       const prev = newsletters[email] || { categories: [], keywords: emptyNewsKeywords() };
@@ -2451,6 +2489,8 @@
     $("adminBtn").onclick = () => $("adminModal").classList.remove("hidden");
     $("closeAdmin").onclick = () => $("adminModal").classList.add("hidden");
     $("adminModal").onclick = (e) => { if (e.target.id === "adminModal") $("adminModal").classList.add("hidden"); };
+    $("closeNewsKw").onclick = () => $("newsKwModal").classList.add("hidden");
+    $("newsKwModal").onclick = (e) => { if (e.target.id === "newsKwModal") $("newsKwModal").classList.add("hidden"); };
     document.querySelectorAll(".menus button").forEach(b => b.onclick = () => openTab(b.dataset.tab));
     $("newsApplyBtn").onclick = () => applyNewsletter(true);
     $("newsStopBtn").onclick = () => applyNewsletter(false);
@@ -2488,7 +2528,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=31");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=32");
   </script>
 </body>
 </html>
