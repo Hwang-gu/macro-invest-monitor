@@ -91,9 +91,17 @@
     .check-row label { margin: 0; }
     .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; gap: 10px; }
     .top small { color: #b7c3d4; font-size: .78rem; }
-    .who-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+    .who-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 2px;
+      letter-spacing: 0; min-width: 0;
+    }
+    .who-row #who { letter-spacing: 0; flex-shrink: 0; }
+    .who-row #whoId {
+      color: #b7c3d4; font-size: .72rem; letter-spacing: 0;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .who-row #logoutBtn {
-      width: auto; margin: 0; padding: 3px 8px; font-size: .72rem;
+      width: auto; margin: 0; padding: 3px 8px; font-size: .72rem; flex-shrink: 0;
     }
     .top-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
     .top-actions button { width: auto; margin: 0; padding: 6px 10px; font-size: .8rem; }
@@ -582,6 +590,7 @@
               <div>Ted Investment</div>
               <div class="who-row">
                 <small id="who"></small>
+                <small id="whoId"></small>
                 <button class="ghost" id="logoutBtn" type="button">Logout</button>
               </div>
             </div>
@@ -590,7 +599,7 @@
         <div class="top-actions">
           <button class="ghost hidden" id="userAddBtn" type="button">Managing User</button>
           <button class="ghost hidden" id="adManageBtn" type="button">Managing AD</button>
-          <button class="ghost" id="pwChangeBtn" type="button">비밀번호 변경</button>
+          <button class="ghost" id="pwChangeBtn" type="button">Password Change</button>
         </div>
       </div>
       <div class="home-quotes" id="homeQuotes" aria-label="Market quotes"></div>
@@ -767,7 +776,7 @@
 
   <div id="pwModal" class="modal-bg hidden">
     <div class="modal form">
-      <h2 id="pwModalTitle">비밀번호 변경</h2>
+      <h2 id="pwModalTitle">Password Change</h2>
       <p class="hint" id="pwModalHint"></p>
       <label for="pwNew">새 비밀번호</label>
       <div class="pw-wrap">
@@ -1763,7 +1772,7 @@
         $("pwModalTitle").textContent = "PW Change";
         $("pwModalHint").textContent = target.id + " 계정의 새 비밀번호를 입력하세요.";
       } else {
-        $("pwModalTitle").textContent = "비밀번호 변경";
+        $("pwModalTitle").textContent = "Password Change";
         $("pwModalHint").textContent = "새 비밀번호를 두 번 입력하세요.";
       }
       $("pwModal").classList.remove("hidden");
@@ -2361,6 +2370,7 @@
     function enter(role, id) {
       currentUser = { role, id };
       $("who").textContent = role;
+      $("whoId").textContent = id || "";
       wireFuturePeriods();
       showFuture("1M");
       $("presentBody").innerHTML = "";
@@ -2599,7 +2609,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=34");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=35");
   </script>
 </body>
 </html>
