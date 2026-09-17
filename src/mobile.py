@@ -195,6 +195,34 @@ def _load_newsletters() -> dict[str, Any]:
     return out
 
 
+def _load_notices() -> list[dict[str, Any]]:
+    path = ROOT / "data" / "ted_notices.json"
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    rows: list[dict[str, Any]] = []
+    for item in data if isinstance(data, list) else []:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        body = str(item.get("body") or "").strip()
+        if not title or not body:
+            continue
+        created = item.get("created")
+        rows.append({
+            "id": str(item.get("id") or "").strip() or f"n{len(rows)+1}",
+            "title": title,
+            "body": body,
+            "created": int(created) if isinstance(created, (int, float)) and created else 0,
+            "author": str(item.get("author") or "").strip(),
+        })
+    rows.sort(key=lambda r: r.get("created") or 0, reverse=True)
+    return rows
+
+
 def _daily_values(series: pd.Series, ndigits: int) -> list[float | None]:
     return [None if v != v else round(float(v), ndigits) for v in series]
 
@@ -448,6 +476,7 @@ def write_mobile_app(
         "disclaimer": report.get("disclaimer"),
         "ads": _load_ads(),
         "newsletters": _load_newsletters(),
+        "notices": _load_notices(),
     }
     _seed_archives_from_git()
     _write_present_archive(str(boot["asof"] or ""), boot["present"], boot["weights"])
@@ -477,6 +506,10 @@ def write_mobile_app(
     )
     (APP_DIR / "newsletters.json").write_text(
         json.dumps(boot.get("newsletters") or {}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (APP_DIR / "notices.json").write_text(
+        json.dumps(boot.get("notices") or [], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     ads_src = ROOT / "data" / "ads"
