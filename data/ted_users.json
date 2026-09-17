@@ -22,20 +22,20 @@
     "role": "User",
     "id": "gym0117@naver.com",
     "hash": "b72f3e90c74d6ad10676d1b60474d899d5595b5910eda95971601086030003ae",
-    "updated": 1789662543448,
+    "updated": 1789662544208,
     "wrap": {
       "v": 1,
       "iter": 210000,
-      "salt": "WHYdE/VJEXhTuKs6tZvlNg==",
-      "iv": "KDmajDo9zq26gSbp",
-      "ct": "Xvwig2zBMEsO1gnBuLctpYfr5RQ9A1sv0NiE/UF3/4aK/bsnaIzHZY/JheCWu/4HLH9tqZEp5aKaOdYJObl1gVEOoYYHLDFoA/OnJykv9xQfG35XCUodyg6w1ZQUkfO84KbdRrUhpyCALBvEeQ=="
+      "salt": "6JZl2v5xqchrAliXNjEyxw==",
+      "iv": "WZn9Imz1FgJdypa4",
+      "ct": "ybLTwPci5Y3axhQmgLe+eL317szTmq6wD7R/avsN8JEUMfWWTZGhvsgifGCgVfLSLN5/qpyRvBabtOYQGlgb7ooZFzwdO4CeeXMP9E0qE4bE/4GCuK4hzjFSSunPivErDPgfUS3IR/+MawKWzQ=="
     },
     "pwBox": {
       "v": 1,
       "iter": 210000,
-      "salt": "hMVrIOFN/eD+txH2yl6b3g==",
-      "iv": "z6niNZEnvOQl6vBj",
-      "ct": "WEPh9+qgZ+R9auxEB/J3tmE="
+      "salt": "5YYXTRCkR4zoCFt7WDBLbQ==",
+      "iv": "6Dnio2jrD/WDRgJg",
+      "ct": "Rx8EWa7/JNSXc79u6bJiOoE="
     }
   },
   {
