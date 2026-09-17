@@ -23,5 +23,17 @@
     },
     "active": false,
     "updated": 1789190035153
+  },
+  "mir8834@daum.net": {
+    "categories": [
+      "stock"
+    ],
+    "keywords": {
+      "gold": [],
+      "stock": [],
+      "bitcoin": []
+    },
+    "active": true,
+    "updated": 1789609848382
   }
 }
