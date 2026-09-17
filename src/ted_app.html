@@ -636,6 +636,11 @@
               <label class="news-kw-label" for="newsKwBitcoin">Keyword</label>
               <input id="newsKwBitcoin" autocomplete="off" placeholder="Ex. 비트코인, 이더리움"/>
             </div>
+            <div class="news-cat-block">
+              <label class="news-cat"><input id="newsOthers" type="checkbox" value="others"/> Others</label>
+              <label class="news-kw-label" for="newsKwOthers">Keyword</label>
+              <input id="newsKwOthers" autocomplete="off" placeholder="Ex. 전기버스, 환율"/>
+            </div>
           </div>
           <div class="err" id="newsErr"></div>
           <div class="ok" id="newsOk"></div>
@@ -1470,10 +1475,10 @@
       $("adModal").classList.remove("hidden");
     }
 
-    const NEWS_CATS = ["gold", "stock", "bitcoin"];
-    const NEWS_LABELS = { gold: "Gold", stock: "Stock", bitcoin: "Bitcoin" };
-    const NEWS_KW_IDS = { gold: "newsKwGold", stock: "newsKwStock", bitcoin: "newsKwBitcoin" };
-    const NEWS_CHECK_IDS = { gold: "newsGold", stock: "newsStock", bitcoin: "newsBitcoin" };
+    const NEWS_CATS = ["gold", "stock", "bitcoin", "others"];
+    const NEWS_LABELS = { gold: "Gold", stock: "Stock", bitcoin: "Bitcoin", others: "Others" };
+    const NEWS_KW_IDS = { gold: "newsKwGold", stock: "newsKwStock", bitcoin: "newsKwBitcoin", others: "newsKwOthers" };
+    const NEWS_CHECK_IDS = { gold: "newsGold", stock: "newsStock", bitcoin: "newsBitcoin", others: "newsOthers" };
     function parseKeywordList(value) {
       if (Array.isArray(value)) return value.map((s) => String(s || "").trim()).filter(Boolean);
       return String(value || "").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
@@ -1614,7 +1619,11 @@
       const categories = selectedNewsCats();
       const keywords = readNewsKeywords();
       if (active && !categories.length) {
-        $("newsErr").textContent = "Gold, Stock, Bitcoin 중 하나 이상 골라 주세요.";
+        $("newsErr").textContent = "Gold, Stock, Bitcoin, Others 중 하나 이상 골라 주세요.";
+        return;
+      }
+      if (active && categories.indexOf("others") >= 0 && !(keywords.others || []).length) {
+        $("newsErr").textContent = "Others는 키워드를 입력해 주세요.";
         return;
       }
       const prev = newsletters[email] || { categories: [], keywords: emptyNewsKeywords() };
@@ -2479,7 +2488,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=30");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=31");
   </script>
 </body>
 </html>

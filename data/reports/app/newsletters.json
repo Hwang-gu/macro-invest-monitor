@@ -9,7 +9,8 @@
         "펩트론",
         "학회"
       ],
-      "bitcoin": []
+      "bitcoin": [],
+      "others": []
     },
     "active": true,
     "updated": 1788972931811
@@ -19,21 +20,27 @@
     "keywords": {
       "gold": [],
       "stock": [],
-      "bitcoin": []
+      "bitcoin": [],
+      "others": []
     },
     "active": false,
     "updated": 1789190035153
   },
   "mir8834@daum.net": {
     "categories": [
-      "stock"
+      "others"
     ],
     "keywords": {
       "gold": [],
       "stock": [],
-      "bitcoin": []
+      "bitcoin": [],
+      "others": [
+        "전기버스",
+        "전기차",
+        "환율"
+      ]
     },
     "active": true,
-    "updated": 1789609848382
+    "updated": 1789611900000
   }
 }

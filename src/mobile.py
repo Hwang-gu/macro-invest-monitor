@@ -152,7 +152,7 @@ def _load_ads() -> dict[str, Any]:
 
 def _load_newsletters() -> dict[str, Any]:
     path = ROOT / "data" / "ted_newsletters.json"
-    allowed = {"gold", "stock", "bitcoin"}
+    allowed = {"gold", "stock", "bitcoin", "others"}
     if not path.exists():
         return {}
     try:
@@ -174,7 +174,7 @@ def _load_newsletters() -> dict[str, Any]:
                 categories.append(name)
         if isinstance(row.get("keywords"), dict):
             keywords = {}
-            for cat in ("gold", "stock", "bitcoin"):
+            for cat in ("gold", "stock", "bitcoin", "others"):
                 raw = row["keywords"].get(cat)
                 if isinstance(raw, list):
                     keywords[cat] = [str(s).strip() for s in raw if str(s).strip()]
@@ -182,10 +182,10 @@ def _load_newsletters() -> dict[str, Any]:
                     keywords[cat] = [s.strip() for s in str(raw or "").replace("，", ",").split(",") if s.strip()]
         elif isinstance(row.get("keywords"), list):
             shared = [str(s).strip() for s in row["keywords"] if str(s).strip()]
-            keywords = {cat: list(shared) if cat in categories else [] for cat in ("gold", "stock", "bitcoin")}
+            keywords = {cat: list(shared) if cat in categories else [] for cat in ("gold", "stock", "bitcoin", "others")}
         else:
             shared = [s.strip() for s in str(row.get("keywords") or "").replace("，", ",").split(",") if s.strip()]
-            keywords = {cat: list(shared) if cat in categories else [] for cat in ("gold", "stock", "bitcoin")}
+            keywords = {cat: list(shared) if cat in categories else [] for cat in ("gold", "stock", "bitcoin", "others")}
         out[email] = {
             "categories": categories,
             "keywords": keywords,
