@@ -35,13 +35,20 @@
     "role": "User",
     "id": "chuk125@naver.com",
     "hash": "9d828517582dc034a9cfc0ac318c620c7908d02c61378e9e2919cda9d4983cb6",
-    "updated": 1788428928685,
+    "updated": 1789662495781,
     "wrap": {
       "v": 1,
       "iter": 210000,
-      "salt": "cAnKP5XmQZSCgRFm9ZC/Xg==",
-      "iv": "60CWTqA0MCgZFTEE",
-      "ct": "lu74C92hLTQb1VSEv93tTo9AIXPJmL4MkjdFsdqiDenKk8wJMzVPozaDy98C6giJTq0TFGuzU9YQxKdCYgYPSYM4QSJdFU6OLDW/rf+gH87/NZ6+ZyejVl+DAyD2qzHdfgxFqq5xmwmq40C3Gw=="
+      "salt": "6uD/hn42OT9VxbcDi7HGnA==",
+      "iv": "7ojKjh6rxUJADq9D",
+      "ct": "s+kTblRWPfG3QSiQybsHQyR1Tp9VW4FYrsY2BaJ+Mb/e+T4w7K0KCHR7KpnjnhY7nZHZv12X8N4dzTdBN6ziF5NDbyahkrd1RUfq2jZ7VdJpLr8fVaexa/fFjM0+pvH0IBmWuorphgilB4ccaA=="
+    },
+    "pwBox": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "W5/RzdypdfVEmAObvJxeQQ==",
+      "iv": "JbzUEvitNQZZ4YHY",
+      "ct": "JIXSSdZYoOpIbUs/SVYSYEg="
     }
   },
   {
