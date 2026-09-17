@@ -22,13 +22,20 @@
     "role": "User",
     "id": "gym0117@naver.com",
     "hash": "b72f3e90c74d6ad10676d1b60474d899d5595b5910eda95971601086030003ae",
-    "updated": 1788133691374,
+    "updated": 1789662543448,
     "wrap": {
       "v": 1,
       "iter": 210000,
-      "salt": "2CRLJeegd1yXuh9fzra9dA==",
-      "iv": "TYCqV8LEmYIKCUaQ",
-      "ct": "ibSmBdIe8sM0BVAIhxcnSdxF7GYy/EZmh302wakeToZEB80C3Ww8Z3dPTyNFmsgbt1fPnI2BICz8we59bIUBM5IW5auY1cVM97e/gJ27EslLQFkpmOpW85N8iJWgdiEuObtPWnwGaU6C3wj+wA=="
+      "salt": "WHYdE/VJEXhTuKs6tZvlNg==",
+      "iv": "KDmajDo9zq26gSbp",
+      "ct": "Xvwig2zBMEsO1gnBuLctpYfr5RQ9A1sv0NiE/UF3/4aK/bsnaIzHZY/JheCWu/4HLH9tqZEp5aKaOdYJObl1gVEOoYYHLDFoA/OnJykv9xQfG35XCUodyg6w1ZQUkfO84KbdRrUhpyCALBvEeQ=="
+    },
+    "pwBox": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "hMVrIOFN/eD+txH2yl6b3g==",
+      "iv": "z6niNZEnvOQl6vBj",
+      "ct": "WEPh9+qgZ+R9auxEB/J3tmE="
     }
   },
   {
