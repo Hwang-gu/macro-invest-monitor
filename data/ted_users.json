@@ -3,7 +3,21 @@
     "role": "User",
     "id": "leeyunjun2@naver.com",
     "hash": "4db48476912e04ea80adcf946610e1eb7891368757bd3cce3f6ee87491b023a4",
-    "updated": 1787763154088
+    "updated": 1789662567247,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "/lHjRKuZIz8tMguZGKQY3g==",
+      "iv": "DGTPAuwtPQcaAn3r",
+      "ct": "0DOC0dh9wouXvTD7OuUVVr9VnSRJ60z8d5FioqF86k/UBnGV5he3oYuIfP5NywPBR45KiJw/nKaJAOErYlU8gwgZI61Lem6n9MCmHXUXkSimm60X9xubZACP6rR59eiSIPnhdV0ZjH4A9qY/0g=="
+    },
+    "pwBox": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "H4CafOkr3CevKi6c+iKR4w==",
+      "iv": "jqR0h854cVotQd4M",
+      "ct": "Ei3KRrKt0O1NpFpFjZXPPjY="
+    }
   },
   {
     "role": "User",
