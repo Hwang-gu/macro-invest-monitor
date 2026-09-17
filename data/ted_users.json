@@ -216,13 +216,20 @@
     "role": "User",
     "id": "mir8834@daum.net",
     "hash": "70e0864e7e68d5788a7f4007b18ec92489b622d4cd31faf6d2c960f920aff663",
-    "updated": 1789609155399,
+    "updated": 1789662581174,
     "wrap": {
       "v": 1,
       "iter": 210000,
-      "salt": "tcuVF4sGItTI+261KvEM6A==",
-      "iv": "Mzl7muSolaw+vA7y",
-      "ct": "8POd4cqL9wj6uSIg39NyAq2yVPgtu1WzuAcjqgri49KQUStQWokgEhj7Si9qY1/SqCL5/yciYSDUVydqlaxnpouytXuIzD86klErBaV3q3CwOO9mLw4xkiAgieGzXBIPxDeKwdAjaeXoTXZXJg=="
+      "salt": "JS8FC401O/QIPKCujzk5ww==",
+      "iv": "c10OklOaroOi85sK",
+      "ct": "TjW4EVBciBrHAN1ZWHf7+iaWr6RbHgf4ixEBCLbwo7b0Q6o0KP0X4gYu1xoIEyOr2650qHtTTisfsaGVUqevrk+tKhEX9Yiv0CMP9fJ78qAj7dNuSAQkRqmTLQhGt5BnLesHcD0g4irvAQRXiw=="
+    },
+    "pwBox": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "vWU7G2VDDv8vTMNvE9PgWg==",
+      "iv": "+ypV8JonJWUovvXv",
+      "ct": "4G54jhfgu+DHHq/vWtdLZEk="
     }
   }
 ]
