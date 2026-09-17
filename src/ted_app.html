@@ -1593,15 +1593,20 @@
       const isMgr = currentUser && currentUser.role === "Manager";
       box.classList.toggle("hidden", !isMgr);
       if (!isMgr) return;
-      const emails = Object.keys(newsletters).sort((a, b) => a.localeCompare(b, "ko"));
+      const emails = Object.keys(newsletters)
+        .filter((email) => {
+          const row = newsletters[email] || {};
+          return row.active !== false && (row.categories || []).length;
+        })
+        .sort((a, b) => a.localeCompare(b, "ko"));
       if (!emails.length) {
         list.innerHTML = "<p class='hint'>아직 신청한 사람이 없습니다.</p>";
         return;
       }
       list.innerHTML = emails.map((email) => {
         const row = newsletters[email] || {};
-        const status = row.active ? "수신 중" : "수신 중단";
-        const statusClass = row.active ? "on" : "off";
+        const status = "수신 중";
+        const statusClass = "on";
         const cats = (row.categories || []).map((c) => NEWS_LABELS[c] || c);
         const catLine = cats.length ? cats.join(", ") : "카테고리 없음";
         const kwLines = NEWS_CATS.map((c) => {
@@ -1664,14 +1669,17 @@
         $("newsKwModal").classList.remove("hidden");
         return;
       }
-      const prev = newsletters[email] || { categories: [], keywords: emptyNewsKeywords() };
-      const row = {
-        categories: active ? categories : (categories.length ? categories : prev.categories),
-        keywords,
-        active: !!active,
-        updated: Date.now()
-      };
-      const next = Object.assign({}, newsletters, { [email]: row });
+      const next = Object.assign({}, newsletters);
+      if (active) {
+        next[email] = {
+          categories,
+          keywords,
+          active: true,
+          updated: Date.now()
+        };
+      } else {
+        delete next[email];
+      }
       let synced = false;
       try { synced = await saveNewsletters(next); }
       catch { $("newsErr").textContent = "저장하지 못했습니다."; return; }
@@ -2528,7 +2536,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=32");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=33");
   </script>
 </body>
 </html>
