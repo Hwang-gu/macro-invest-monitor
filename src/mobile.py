@@ -212,11 +212,15 @@ def _load_notices() -> list[dict[str, Any]]:
         if not title or not body:
             continue
         created = item.get("created")
+        updated = item.get("updated")
+        views = item.get("views")
         rows.append({
             "id": str(item.get("id") or "").strip() or f"n{len(rows)+1}",
             "title": title,
             "body": body,
             "created": int(created) if isinstance(created, (int, float)) and created else 0,
+            "updated": int(updated) if isinstance(updated, (int, float)) and updated else 0,
+            "views": int(views) if isinstance(views, (int, float)) and views > 0 else 0,
             "author": str(item.get("author") or "").strip(),
         })
     rows.sort(key=lambda r: r.get("created") or 0, reverse=True)
