@@ -95,13 +95,20 @@
     "role": "User",
     "id": "hkm04051000@gmail.com",
     "hash": "b845e1c0d8bba3d9b0825dd04183350c11adea0a1dadb884b11cdf7c7d420f74",
-    "updated": 1789189272851,
+    "updated": 1789662550820,
     "wrap": {
       "v": 1,
       "iter": 210000,
-      "salt": "mDokxC1AySXP/eMnC2hkpQ==",
-      "iv": "CDbZbVqsYJg1NiZ5",
-      "ct": "6szhASDjwmjCergiL2HTvzrMjm2FzKQkFieYyFmjQZFZ3SyM8EiQbo15qjOta1OwxBWx+0nUpNCrY8ZQXojDQ9u1TLb9ZMdsS2AItUXKzpl7DLQcVv/L1G7uQNs5peTYXB+l3burUBPA2hoWWg=="
+      "salt": "/AjOcecqwCA/BgSBnkfkMg==",
+      "iv": "B5JHpmIsCnvMzlZ1",
+      "ct": "dGdfD6kDglP3lO8cpvNPKx4+yrbHfvBxdArYka5w9MDJTFsaXULvD6gtSRTxTgBL6IjZ/w6JGxbQmWqDw1lr4071mU1E4qf9IP3ODjpu88g1lle7v1EB2j0bUt4KbBFSXpqPYz2JSZSri0Jifg=="
+    },
+    "pwBox": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "vJihh4cbmgwM+B7AfFBaKQ==",
+      "iv": "MgCjVj61OQhuPCn0",
+      "ct": "5JnOUSx6yzjuCrS8XNrrsmU="
     }
   },
   {
