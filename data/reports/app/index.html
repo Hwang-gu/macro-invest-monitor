@@ -225,17 +225,27 @@
     }
     .modal.form { text-align: left; }
     .modal.form h2 { text-align: center; font-size: 1.05rem; letter-spacing: .08em; margin-bottom: 8px; }
-    .weights div, .user-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1c2a44; }
-    .user-row { font-size: .82rem; gap: 8px; flex-wrap: wrap; }
-    .user-row > span:first-child {
-      flex: 1 1 120px;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: #d7dee8;
+    .weights div { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1c2a44; }
+    .user-row {
+      display: flex; flex-direction: column; align-items: stretch;
+      gap: 8px; padding: 12px 0; border-bottom: 1px solid #1c2a44;
+      font-size: .82rem;
     }
-    .user-row button { width: auto; padding: 6px 10px; font-size: .78rem; margin: 0; }
-    .user-row .row-actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: auto; }
+    .user-row-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .user-row-id { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #d7dee8; word-break: break-all; }
+    .user-role {
+      flex-shrink: 0; font-size: .68rem; letter-spacing: .04em;
+      padding: 3px 8px; border-radius: 999px; border: 1px solid #3a4d6b; color: #b7c3d4;
+    }
+    .user-role.manager { color: #9ad0ff; border-color: #6ea2e6; background: #152238; }
+    .user-pw-row { display: flex; align-items: center; gap: 8px; color: #b7c3d4; font-size: .76rem; }
+    .user-pw-row .pw-label { flex-shrink: 0; }
+    .user-pw-value { flex: 1; min-width: 0; color: #d7dee8; word-break: break-all; }
+    .user-pw-value.muted { color: #8a97ab; }
+    .user-pw-row button, .user-row .row-actions button {
+      width: auto; margin: 0; padding: 4px 8px; font-size: .72rem;
+    }
+    .user-row .row-actions { display: flex; gap: 6px; }
     #userModal .modal.form { max-height: min(88vh, 720px); overflow: auto; }
     .pw-wrap { position: relative; }
     .pw-wrap input { padding-right: 52px; width: 100%; }
@@ -356,8 +366,37 @@
       accent-color: #6ea2e6;
     }
     .news-kw-label { margin: 8px 0 6px; }
+    .news-form input { font-size: .92rem; }
+    .news-form input::placeholder {
+      font-size: .72rem;
+      color: #7f8da3;
+    }
     .news-form button.primary { margin-top: 12px; }
     .news-form button.ghost { margin-top: 8px; white-space: normal; line-height: 1.25; }
+    .news-admin {
+      margin: 0 0 22px;
+      padding: 12px;
+      border: 1px solid #2d5a9a;
+      border-radius: 12px;
+      background: #10192b;
+    }
+    .news-admin h3 {
+      margin: 0 0 10px;
+      font-size: .88rem;
+      font-weight: normal;
+      letter-spacing: .06em;
+    }
+    .news-admin-row {
+      padding: 10px 0;
+      border-bottom: 1px solid #1c2a44;
+      font-size: .8rem;
+    }
+    .news-admin-row:last-child { border-bottom: 0; }
+    .news-admin-id { color: #d7dee8; word-break: break-all; }
+    .news-admin-status { color: #9ad0a8; font-size: .74rem; margin-top: 4px; }
+    .news-admin-status.off { color: #b7c3d4; }
+    .news-admin-kw { color: #b7c3d4; font-size: .74rem; margin-top: 6px; line-height: 1.45; }
+    .news-admin-cat { color: #9ad0ff; margin-right: 6px; }
 
     @media (min-width: 960px) {
       html, body { height: 100%; }
@@ -576,12 +615,16 @@
         <div id="futureBody"></div>
       </div>
       <div id="news" class="panel hidden">
+        <div id="newsAdmin" class="news-admin hidden">
+          <h3>신청 현황</h3>
+          <div id="newsAdminList"></div>
+        </div>
         <div class="news-form">
           <div class="news-cats">
             <div class="news-cat-block">
               <label class="news-cat"><input id="newsGold" type="checkbox" value="gold"/> Gold</label>
               <label class="news-kw-label" for="newsKwGold">Keyword</label>
-              <input id="newsKwGold" autocomplete="off" placeholder="Ex. 하이닉스, 펩트론 임상"/>
+              <input id="newsKwGold" autocomplete="off" placeholder="Ex. 금 현물"/>
             </div>
             <div class="news-cat-block">
               <label class="news-cat"><input id="newsStock" type="checkbox" value="stock"/> Stock</label>
@@ -591,7 +634,7 @@
             <div class="news-cat-block">
               <label class="news-cat"><input id="newsBitcoin" type="checkbox" value="bitcoin"/> Bitcoin</label>
               <label class="news-kw-label" for="newsKwBitcoin">Keyword</label>
-              <input id="newsKwBitcoin" autocomplete="off" placeholder="Ex. 하이닉스, 펩트론 임상"/>
+              <input id="newsKwBitcoin" autocomplete="off" placeholder="Ex. 비트코인, 이더리움"/>
             </div>
           </div>
           <div class="err" id="newsErr"></div>
@@ -614,6 +657,7 @@
     <div class="modal form">
       <h2>Managing User</h2>
       <div id="userList"></div>
+      <p class="hint">비밀번호는 매니저 로그인 후에만 볼 수 있습니다. 기존 계정은 비밀번호를 한 번 바꾸면 표시됩니다.</p>
       <label for="newUserId">ID</label>
       <input id="newUserId" autocomplete="off"/>
       <label for="newUserPw">First Password</label>
@@ -789,6 +833,7 @@
         updated: Number(a.updated || 0)
       };
       if (a.wrap && a.wrap.ct) row.wrap = a.wrap;
+      if (a.pwBox && a.pwBox.ct) row.pwBox = a.pwBox;
       if (!prev || row.updated >= Number(prev.updated || 0)) map.set(key, row);
     }
     function mergeLiveUsers(byId) {
@@ -910,6 +955,17 @@
       try { return await lockBox(pw, token); }
       catch { return null; }
     }
+    async function wrapStoredPassword(pw) {
+      const token = currentWriteToken();
+      if (!token || !pw) return null;
+      try { return await lockBox(token, pw); }
+      catch { return null; }
+    }
+    async function readStoredPassword(row) {
+      if (!row || !row.pwBox || !row.pwBox.ct) return "";
+      try { return await unlockBox(currentWriteToken(), row.pwBox); }
+      catch { return ""; }
+    }
     function utf8ToB64(text) {
       return u8ToB64(new TextEncoder().encode(text));
     }
@@ -996,6 +1052,7 @@
         updated: Number(a.updated || 0)
       };
       if (a.wrap && a.wrap.ct) row.wrap = a.wrap;
+      if (a.pwBox && a.pwBox.ct) row.pwBox = a.pwBox;
       return row;
     }
     async function saveUserStore(list) {
@@ -1041,6 +1098,9 @@
       const wrap = await wrapForPassword(pw);
       if (wrap) row.wrap = wrap;
       else if (prev && prev.wrap) row.wrap = prev.wrap;
+      const pwBox = await wrapStoredPassword(pw);
+      if (pwBox) row.pwBox = pwBox;
+      else if (prev && prev.pwBox && !currentWriteToken()) row.pwBox = prev.pwBox;
       const idx = list.findIndex(a => String(a.id).toLowerCase() === key);
       if (idx >= 0) list[idx] = row;
       else list.push(row);
@@ -1056,19 +1116,74 @@
     function clearAuto() {
       localStorage.removeItem(AUTO_KEY);
     }
-    function renderUsers() {
-      const store = userStore();
-      const locked = envIds();
-      const rows = store.map((a, i) => {
-        const del = locked.has(String(a.id).toLowerCase())
-          ? ""
-          : `<button type="button" data-del="${i}">Delete</button>`;
-        return `<div class="user-row"><span>${escapeHtml(a.id)}</span><span class="row-actions"><button type="button" data-pw="${i}">PW Change</button>${del}</span></div>`;
+    function listedAccounts() {
+      const rows = allAuth().slice();
+      rows.sort((a, b) => {
+        if (a.role !== b.role) return a.role === "Manager" ? -1 : 1;
+        return String(a.id).localeCompare(String(b.id), "ko");
       });
-      $("userList").innerHTML = rows.join("") || "<p class='hint'>아직 만든 계정이 없습니다.</p>";
+      return rows;
+    }
+    async function renderUsers() {
+      const store = listedAccounts();
+      const locked = envIds();
+      const chunks = [];
+      for (const a of store) {
+        const role = a.role === "Manager" ? "Manager" : "User";
+        const key = String(a.id).toLowerCase();
+        const envLocked = locked.has(key);
+        const canDelete = role === "User" && !envLocked;
+        const canChangePw = role === "User";
+        const hasBox = !!(a.pwBox && a.pwBox.ct);
+        let pwHtml;
+        if (hasBox && currentWriteToken()) {
+          pwHtml = `<span class="user-pw-value" data-mask="1">••••••••</span><button type="button" data-reveal="${escapeHtml(a.id)}">보기</button>`;
+        } else if (hasBox) {
+          pwHtml = `<span class="user-pw-value muted">매니저로 다시 로그인해 주세요.</span>`;
+        } else if (envLocked) {
+          pwHtml = `<span class="user-pw-value muted">환경 계정은 앱에서 확인할 수 없습니다.</span>`;
+        } else {
+          pwHtml = `<span class="user-pw-value muted">다음 비밀번호 변경부터 표시됩니다.</span>`;
+        }
+        const actions = [
+          canChangePw ? `<button type="button" data-pw="${escapeHtml(a.id)}">PW Change</button>` : "",
+          canDelete ? `<button type="button" data-del="${escapeHtml(a.id)}">Delete</button>` : ""
+        ].join("");
+        chunks.push(
+          `<div class="user-row" data-user="${escapeHtml(a.id)}">`
+          + `<div class="user-row-head"><span class="user-row-id">${escapeHtml(a.id)}</span><span class="user-role ${role === "Manager" ? "manager" : "user"}">${role}</span></div>`
+          + `<div class="user-pw-row"><span class="pw-label">PW</span>${pwHtml}</div>`
+          + (actions ? `<span class="row-actions">${actions}</span>` : "")
+          + `</div>`
+        );
+      }
+      $("userList").innerHTML = chunks.join("") || "<p class='hint'>아직 만든 계정이 없습니다.</p>";
+      $("userList").querySelectorAll("[data-reveal]").forEach(btn => {
+        btn.onclick = async () => {
+          const row = store.find(a => String(a.id) === btn.dataset.reveal);
+          const valueEl = btn.parentElement && btn.parentElement.querySelector(".user-pw-value");
+          if (!row || !valueEl) return;
+          const showing = valueEl.dataset.mask !== "1";
+          if (showing) {
+            valueEl.textContent = "••••••••";
+            valueEl.dataset.mask = "1";
+            btn.textContent = "보기";
+            return;
+          }
+          const secret = await readStoredPassword(row);
+          if (!secret) {
+            valueEl.textContent = "열 수 없습니다. 매니저로 다시 로그인해 주세요.";
+            valueEl.classList.add("muted");
+            return;
+          }
+          valueEl.textContent = secret;
+          valueEl.dataset.mask = "0";
+          btn.textContent = "숨김";
+        };
+      });
       $("userList").querySelectorAll("[data-del]").forEach(btn => {
         btn.onclick = async () => {
-          const row = store[Number(btn.dataset.del)];
+          const row = store.find(a => String(a.id) === btn.dataset.del);
           if (!row) return;
           $("userErr").textContent = "";
           $("userOk").textContent = "";
@@ -1088,7 +1203,7 @@
             try { await saveNewsletters(nextNews); }
             catch {}
           }
-          renderUsers();
+          await renderUsers();
           $("userOk").textContent = synced
             ? "삭제했습니다."
             : "이 기기에서는 지웠습니다. 다른 기기에도 맞추려면 매니저로 다시 로그인해 주세요.";
@@ -1096,8 +1211,10 @@
       });
       $("userList").querySelectorAll("[data-pw]").forEach(btn => {
         btn.onclick = () => {
+          const row = store.find(a => String(a.id) === btn.dataset.pw);
+          if (!row) return;
           $("pwSaveBtn").disabled = false;
-          openPwModal(store[Number(btn.dataset.pw)]);
+          openPwModal(row);
         };
       });
     }
@@ -1354,6 +1471,7 @@
     }
 
     const NEWS_CATS = ["gold", "stock", "bitcoin"];
+    const NEWS_LABELS = { gold: "Gold", stock: "Stock", bitcoin: "Bitcoin" };
     const NEWS_KW_IDS = { gold: "newsKwGold", stock: "newsKwStock", bitcoin: "newsKwBitcoin" };
     const NEWS_CHECK_IDS = { gold: "newsGold", stock: "newsStock", bitcoin: "newsBitcoin" };
     function parseKeywordList(value) {
@@ -1423,6 +1541,37 @@
       });
       $("newsErr").textContent = "";
       $("newsOk").textContent = row.active ? "현재 수신 중입니다." : "";
+      renderNewsAdmin();
+    }
+    function renderNewsAdmin() {
+      const box = $("newsAdmin");
+      const list = $("newsAdminList");
+      if (!box || !list) return;
+      const isMgr = currentUser && currentUser.role === "Manager";
+      box.classList.toggle("hidden", !isMgr);
+      if (!isMgr) return;
+      const emails = Object.keys(newsletters).sort((a, b) => a.localeCompare(b, "ko"));
+      if (!emails.length) {
+        list.innerHTML = "<p class='hint'>아직 신청한 사람이 없습니다.</p>";
+        return;
+      }
+      list.innerHTML = emails.map((email) => {
+        const row = newsletters[email] || {};
+        const status = row.active ? "수신 중" : "수신 중단";
+        const statusClass = row.active ? "on" : "off";
+        const cats = (row.categories || []).map((c) => NEWS_LABELS[c] || c);
+        const catLine = cats.length ? cats.join(", ") : "카테고리 없음";
+        const kwLines = NEWS_CATS.map((c) => {
+          const words = (row.keywords && row.keywords[c]) || [];
+          if (!words.length && (row.categories || []).indexOf(c) < 0) return "";
+          return `<div><span class="news-admin-cat">${NEWS_LABELS[c]}</span>${escapeHtml(words.join(", ") || "(키워드 없음)")}</div>`;
+        }).filter(Boolean).join("");
+        return `<div class="news-admin-row">`
+          + `<div class="news-admin-id">${escapeHtml(email)}</div>`
+          + `<div class="news-admin-status ${statusClass}">${status} · ${escapeHtml(catLine)}</div>`
+          + `<div class="news-admin-kw">${kwLines || "<div>조건 없음</div>"}</div>`
+          + `</div>`;
+      }).join("");
     }
     async function loadNewsJson(url, headers) {
       const r = await fetch(url, { cache: "no-store", headers: headers || {} });
@@ -2073,7 +2222,10 @@
           if (selectedPresent) showPresentDate(selectedPresent);
         });
       }
-      if (name === "news") fillNewsForm();
+      if (name === "news") {
+        fillNewsForm();
+        if (currentUser && currentUser.role === "Manager") refreshNewsletters();
+      }
     }
 
     function resizePast() {
@@ -2168,13 +2320,15 @@
       const row = { role: "User", id, hash, updated: Date.now() };
       const wrap = await wrapForPassword(pw);
       if (wrap) row.wrap = wrap;
+      const pwBox = await wrapStoredPassword(pw);
+      if (pwBox) row.pwBox = pwBox;
       list.push(row);
       let synced = false;
       try { synced = await saveUserStore(list); }
       catch { $("userErr").textContent = "이 브라우저에 계정을 저장하지 못했습니다."; return; }
       $("newUserId").value = "";
       resetPwField("newUserPw");
-      renderUsers();
+      await renderUsers();
       $("userOk").textContent = synced
         ? "계정을 만들었습니다."
         : "이 기기에는 저장됐습니다. 다른 기기에도 바로 쓰려면 매니저 비밀번호로 다시 로그인해 주세요.";
@@ -2259,7 +2413,7 @@
         $("pwErr").textContent = "저장할 수 없습니다. 페이지를 새로고침해 주세요.";
         return;
       }
-      renderUsers();
+      await renderUsers();
       if (currentUser && currentUser.role === "User" && String(currentUser.id).toLowerCase() === String(target.id).toLowerCase()) {
         const h = await digest("User|" + target.id + "|" + pw);
         const auto = autoRecord();
@@ -2325,7 +2479,7 @@
       if (saved && !savedOk) clearAuto();
       show("login");
     });
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=29");
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=30");
   </script>
 </body>
 </html>

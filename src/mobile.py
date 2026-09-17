@@ -121,6 +121,9 @@ def _extra_user_records() -> list[dict[str, Any]]:
         wrap = item.get("wrap")
         if isinstance(wrap, dict) and wrap.get("ct"):
             row["wrap"] = wrap
+        pw_box = item.get("pwBox")
+        if isinstance(pw_box, dict) and pw_box.get("ct"):
+            row["pwBox"] = pw_box
         rows.append(row)
     return rows
 
