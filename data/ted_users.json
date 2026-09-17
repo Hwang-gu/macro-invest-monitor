@@ -35,20 +35,20 @@
     "role": "User",
     "id": "chuk125@naver.com",
     "hash": "9d828517582dc034a9cfc0ac318c620c7908d02c61378e9e2919cda9d4983cb6",
-    "updated": 1789662495781,
+    "updated": 1789662494767,
     "wrap": {
       "v": 1,
       "iter": 210000,
-      "salt": "6uD/hn42OT9VxbcDi7HGnA==",
-      "iv": "7ojKjh6rxUJADq9D",
-      "ct": "s+kTblRWPfG3QSiQybsHQyR1Tp9VW4FYrsY2BaJ+Mb/e+T4w7K0KCHR7KpnjnhY7nZHZv12X8N4dzTdBN6ziF5NDbyahkrd1RUfq2jZ7VdJpLr8fVaexa/fFjM0+pvH0IBmWuorphgilB4ccaA=="
+      "salt": "sAt8w9mYyh21Dk8Ixb+dfw==",
+      "iv": "IbRmZ8/iL+9JeM3f",
+      "ct": "fS7wTnNt2JBX5a7hNiIMJGEnCG+9q503swRMCa1EMtlCodq98bJp5dPHLn714o0FEIIZG1Ssg6CFjza0vdqAPo3sDRc6Hnwu+Hw+tDBkH3N/NF5dptCe/Ad6U42I5gHouJLDFpMf+u/s53508A=="
     },
     "pwBox": {
       "v": 1,
       "iter": 210000,
-      "salt": "W5/RzdypdfVEmAObvJxeQQ==",
-      "iv": "JbzUEvitNQZZ4YHY",
-      "ct": "JIXSSdZYoOpIbUs/SVYSYEg="
+      "salt": "T+JBxDSovP0oZF9D7VRgZQ==",
+      "iv": "GG8HT5VwjTBpWS03",
+      "ct": "jg++TtoMXsa69kXzyXKJnPY="
     }
   },
   {
