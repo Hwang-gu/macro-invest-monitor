@@ -26,6 +26,26 @@ def _start_str(start: date | None = None) -> str:
     return (start or START).isoformat()
 
 
+# 티커 파일을 못 찾은 기존 원본은 개별 종목 대용일 수 있어 재수집한다.
+RESET_IF_NO_TICKER_META = {"kr_semi", "kr_bio", "kr_finance", "kr_ship", "kr_robot"}
+
+
+def _ticker_meta_path(key: str):
+    return RAW_DIR / f"{key}.ticker"
+
+
+def _read_stored_ticker(key: str) -> str | None:
+    path = _ticker_meta_path(key)
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8").strip()
+    return text or None
+
+
+def _write_stored_ticker(key: str, ticker: str) -> None:
+    _ticker_meta_path(key).write_text(ticker, encoding="utf-8")
+
+
 def _read_existing(key: str) -> pd.Series | None:
     path = RAW_DIR / f"{key}.csv"
     if not path.exists():
@@ -195,7 +215,17 @@ def _incremental_start(existing: pd.Series | None) -> date:
 
 def collect_one(spec: Series, full: bool = False) -> pd.Series:
     existing = None if full else _read_existing(spec.key)
-    start = START if full else _incremental_start(existing)
+    stored_ticker = _read_stored_ticker(spec.key)
+    ticker_changed = stored_ticker is not None and stored_ticker != spec.ticker
+    legacy_unverified = stored_ticker is None and existing is not None and spec.key in RESET_IF_NO_TICKER_META
+    if ticker_changed or legacy_unverified:
+        prev = stored_ticker or "legacy-stock"
+        print(f"[{spec.key}] 티커 변경으로 원본을 폐기하고 재수집합니다 ({prev} → {spec.ticker})")
+        existing = None
+        csv_path = RAW_DIR / f"{spec.key}.csv"
+        if csv_path.exists():
+            csv_path.unlink()
+    start = START if full or existing is None else _incremental_start(existing)
     series: Optional[pd.Series] = None
     errors: list[str] = []
 
@@ -242,7 +272,9 @@ def collect_one(spec: Series, full: bool = False) -> pd.Series:
         raise RuntimeError(f"{spec.key} 수집 실패: {'; '.join(errors)}")
 
     merged = _merge(existing, series)
-    return _save(spec.key, merged)
+    saved = _save(spec.key, merged)
+    _write_stored_ticker(spec.key, spec.ticker)
+    return saved
 
 
 def collect_all(full: bool = False, pause: float = 0.4) -> dict[str, pd.Series]:

@@ -4,6 +4,7 @@ yfinance>=0.2.50
 requests>=2.32
 python-dotenv>=1.0
 scikit-learn>=1.6
+lightgbm>=4.5
 joblib>=1.4
 pyarrow>=17
 plotly>=5.24

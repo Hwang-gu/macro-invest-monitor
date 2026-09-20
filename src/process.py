@@ -7,24 +7,39 @@ import pandas as pd
 
 from .config import (
     ASSET_KEYS,
+    DAILY_FFILL_LIMIT,
+    DENSE_MONTHLY_OBS_RATIO,
     EVENTS_PATH,
+    MACRO_PUBLICATION_LAG_BDAYS,
+    MONTHLY_FFILL_LIMIT,
     PROCESSED_DIR,
     START,
-    Series,
-    UNIVERSE,
+    YEARLY_FFILL_LIMIT,
     series_by_key,
 )
 
 
 REQUIRED_EVENT_FIELDS = ("id", "date", "end_date", "category", "severity", "name_ko", "summary_ko")
 ALLOWED_CATEGORIES = {
-    "war", "disease", "technology", "financial_crisis", "geopolitics", "policy",
-    "technology", "financial_crisis", "geopolitics",
+    "war",
+    "disease",
+    "technology",
+    "financial_crisis",
+    "geopolitics",
+    "policy",
 }
 CATEGORY_ALIASES = {
     "technology": "technology",
     "financial_crisis": "financial_crisis",
     "geopolitics": "geopolitics",
+}
+EVENT_FEATURE_MAP = {
+    "war": "event_war",
+    "disease": "event_disease",
+    "technology": "event_tech",
+    "financial_crisis": "event_crisis",
+    "geopolitics": "event_geopolitics",
+    "policy": "event_policy",
 }
 
 
@@ -60,9 +75,9 @@ def load_events() -> pd.DataFrame:
 
 
 def to_panel(raw: dict[str, pd.Series]) -> pd.DataFrame:
-    """거래일 달력에 맞춰 가격·금리를 정렬하고, 월간 지표는 전방 보간합니다."""
+    """거래일 달력에 맞춰 정렬하고, 월간 거시는 발표 시차만큼 래깅합니다."""
     frames = []
-    for spec in UNIVERSE:
+    for spec in series_by_key().values():
         if spec.key not in raw:
             continue
         s = raw[spec.key].copy()
@@ -78,34 +93,46 @@ def to_panel(raw: dict[str, pd.Series]) -> pd.DataFrame:
         raise ValueError("2000-01-01 이후 원본 데이터가 없습니다.")
     start = max(pd.Timestamp(START), panel.index.min())
     biz = pd.bdate_range(start, panel.index.max())
-    panel = panel.reindex(biz)
+    # 월초가 주말이면 관측이 거래일 인덱스에서 사라지지 않게 다음 영업일로 옮긴다.
     meta = series_by_key()
+    aligned = {}
+    for col in panel.columns:
+        s = panel[col].dropna()
+        spec = meta.get(col)
+        if spec is not None and spec.frequency in {"monthly", "yearly"} and not s.empty:
+            s.index = pd.DatetimeIndex(s.index) + pd.offsets.BDay(0)
+            s = s.groupby(s.index).last()
+        aligned[col] = s
+    panel = pd.DataFrame(aligned).sort_index()
+    panel = panel.reindex(biz)
     for col in panel.columns:
         spec = meta.get(col)
         if spec is None:
             continue
-        if spec.frequency == "monthly":
-            panel[col] = panel[col].ffill(limit=80)
-        elif spec.frequency == "yearly":
-            panel[col] = panel[col].ffill(limit=520)
+        obs_ratio = float(panel[col].notna().mean())
+        dense = obs_ratio >= DENSE_MONTHLY_OBS_RATIO
+        if spec.frequency == "yearly":
+            filled = panel[col].ffill(limit=YEARLY_FFILL_LIMIT)
+            panel[col] = filled.shift(MACRO_PUBLICATION_LAG_BDAYS)
+        elif spec.frequency == "monthly" and not dense:
+            filled = panel[col].ffill(limit=MONTHLY_FFILL_LIMIT)
+            panel[col] = filled.shift(MACRO_PUBLICATION_LAG_BDAYS)
+        elif spec.frequency == "monthly" and dense:
+            panel[col] = panel[col].ffill(limit=DAILY_FFILL_LIMIT)
         else:
-            panel[col] = panel[col].ffill(limit=8)
+            panel[col] = panel[col].ffill(limit=DAILY_FFILL_LIMIT)
     return panel
-
-
-def _yoy(series: pd.Series, periods: int = 252) -> pd.Series:
-    return series.pct_change(periods) * 100.0
 
 
 def _monthly_yoy(series: pd.Series) -> pd.Series:
     m = series.resample("ME").last().dropna()
     yoy = m.pct_change(12) * 100.0
-    return yoy.reindex(series.index, method="ffill", limit=80)
+    return yoy.reindex(series.index, method="ffill", limit=MONTHLY_FFILL_LIMIT)
 
 
 def build_features(panel: pd.DataFrame) -> pd.DataFrame:
     extras: dict[str, pd.Series] = {}
-    skip = {"us_3m", "us_2y", "us_10y", "us_ffr", "kr_call", "kr_10y", "us_cpi", "kr_cpi", "kr_infl_wb"}
+    skip = {"us_3m", "us_2y", "us_10y", "us_ffr", "kr_call", "kr_10y", "us_cpi", "kr_cpi"}
     price_like = [c for c in panel.columns if c not in skip]
     for col in price_like:
         ret = panel[col].pct_change()
@@ -130,34 +157,27 @@ def build_features(panel: pd.DataFrame) -> pd.DataFrame:
     if "us_cpi" in panel:
         extras["us_cpi_yoy"] = _monthly_yoy(panel["us_cpi"])
     if "kr_cpi" in panel:
-        monthly = _monthly_yoy(panel["kr_cpi"])
-        last_obs = panel["kr_cpi"].last_valid_index()
-        stale = last_obs is None or (panel.index.max() - last_obs).days > 180
-        if stale and "kr_infl_wb" in panel:
-            extras["kr_cpi_yoy"] = panel["kr_infl_wb"]
-        else:
-            extras["kr_cpi_yoy"] = monthly
+        extras["kr_cpi_yoy"] = _monthly_yoy(panel["kr_cpi"])
     if "us_cpi_yoy" in extras and "us_10y" in panel:
         extras["us_real_10y"] = panel["us_10y"] - extras["us_cpi_yoy"]
     if "us_cpi_yoy" in extras and "us_3m" in panel:
         extras["us_real_3m"] = panel["us_3m"] - extras["us_cpi_yoy"]
 
+    if "vix" in panel:
+        extras["vix_high"] = (panel["vix"] > 20).astype(float)
+    if "us_curve_10_2" in extras:
+        extras["curve_inverted"] = (extras["us_curve_10_2"] < 0).astype(float)
+        if "vix_high" in extras:
+            extras["risk_off"] = (
+                (extras["vix_high"] > 0) | (extras["curve_inverted"] > 0)
+            ).astype(float)
+
     events = load_events()
-    extras["event_war"] = pd.Series(0.0, index=panel.index)
-    extras["event_disease"] = pd.Series(0.0, index=panel.index)
-    extras["event_tech"] = pd.Series(0.0, index=panel.index)
-    extras["event_crisis"] = pd.Series(0.0, index=panel.index)
+    for col in EVENT_FEATURE_MAP.values():
+        extras[col] = pd.Series(0.0, index=panel.index)
     for _, ev in events.iterrows():
         mask = (panel.index >= ev["date"]) & (panel.index <= ev["end_date"])
-        cat = ev["category"]
-        col = {
-            "war": "event_war",
-            "disease": "event_disease",
-            "technology": "event_tech",
-            "financial_crisis": "event_crisis",
-            "geopolitics": "event_crisis",
-            "policy": "event_crisis",
-        }.get(cat)
+        col = EVENT_FEATURE_MAP.get(ev["category"])
         if col:
             extras[col] = extras[col].mask(mask, 1.0)
 

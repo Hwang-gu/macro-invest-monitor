@@ -219,7 +219,7 @@ if report.get("active_events"):
 st.divider()
 st.markdown(
     report["disclaimer"]
-    + " 업종은 ETF·대표주로 대체했습니다(한국 반도체=SK하이닉스, 바이오=셀트리온, 금융=신한지주, 조선=HD한국조선해양, 로봇=LS일렉트릭). "
+    + " 한국 업종은 섹터 ETF입니다(KODEX 반도체, TIGER 헬스케어, KODEX 은행, TIGER 200 중공업, KODEX 로봇액티브). "
     "이슈 목록은 `data/events.json`에서 수정할 수 있습니다."
 )
 if report["commentary"].get("gemini"):

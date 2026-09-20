@@ -58,12 +58,12 @@ def rule_commentary(report: dict[str, Any], channels: list[dict[str, Any]] | Non
     if r.get("inverted_curve"):
         lines.append("미국 장단기 금리가 역전되어 있습니다. 경기 둔화 신호로 금융주보다 방어 자산 가중치를 높이는 근거가 됩니다.")
     if r.get("risk_off"):
-        lines.append("변동성(VIX) 또는 금리 역전으로 위험회피 점수를 가산했습니다.")
+        lines.append("VIX가 높거나 장단기 금리가 역전된 위험회피 성격의 국면입니다. 이 조건은 더미 변수로 모델이 학습합니다.")
 
     events = report.get("active_events") or []
     if events:
         names = ", ".join(e["name_ko"] for e in events[:5])
-        lines.append(f"최근·진행 중 이슈: {names}. 전쟁·질병은 금, 신기술은 나스닥·반도체·로봇 점수를 조정합니다.")
+        lines.append(f"최근·진행 중 이슈: {names}. 전쟁·질병·정책 등은 가감점이 아니라 더미 피처로 반영됩니다.")
 
     if channels:
         notable = sorted(channels, key=lambda c: abs(c.get("corr_0") or 0), reverse=True)[:3]
@@ -164,7 +164,7 @@ def present_briefing(report: dict[str, Any], channels: list[dict[str, Any]] | No
     if kr_semi > 0.02 or us_semi > 0.02 or nasdaq_s > kospi_s:
         paragraphs.append(
             "미시적으로는 AI·고대역폭 메모리 수요가 이어지며 반도체 쪽이 상대적으로 앞섭니다. "
-            "한국에서는 SK하이닉스 대용 시계열이 그 경로를 대표하고, 대형 반도체 비중이 큰 코스피가 중소형(코스닥)보다 "
+            "한국에서는 KODEX 반도체 ETF가 그 경로를 대표하고, 대형 반도체 비중이 큰 코스피가 중소형(코스닥)보다 "
             f"{'앞서' if kospi_s > kosdaq_s else '덜 앞선 채'} 움직이고 있습니다."
         )
     elif kosdaq_s > kospi_s + 0.02:
@@ -179,7 +179,7 @@ def present_briefing(report: dict[str, Any], channels: list[dict[str, Any]] | No
     events = report.get("active_events") or []
     if events:
         names = ", ".join(e.get("name_ko") or "" for e in events[:5])
-        paragraphs.append(f"진행 중 이슈({names})가 금·성장주·방산/조선 점수에 가점·감점으로 들어가 있습니다.")
+        paragraphs.append(f"진행 중 이슈({names})는 전쟁·질병·정책 더미로 모델 입력에 들어갑니다.")
 
     if channels:
         notable = sorted(channels, key=lambda c: abs(c.get("corr_0") or 0), reverse=True)[:2]
@@ -214,14 +214,14 @@ def future_briefing(report: dict[str, Any], seasonal: dict[str, Any] | None = No
     )
     if fc.get("stage4_stock"):
         parts.append(
-            f"코스피로 내려가면 대표 종목 대용은 {fc['stage4_stock']}"
+            f"코스피로 내려가면 업종은 섹터 ETF {fc['stage4_stock']}"
             + (f" ({fc.get('stage4_ticker')})" if fc.get("stage4_ticker") else "")
-            + " 입니다. 업종 ETF·바스켓이 더 안전합니다."
+            + " 로 평가합니다."
         )
     if seasonal.get("note"):
         parts.append(seasonal["note"])
     if fc.get("reasons"):
-        parts.append("가점·감점 근거: " + " / ".join(fc["reasons"][:4]) + ".")
+        parts.append("국면 참고: " + " / ".join(fc["reasons"][:4]) + ".")
     return {
         "title": _asof_dot(report.get("asof")),
         "paragraphs": parts,

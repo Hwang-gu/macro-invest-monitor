@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from typing import Any
+from typing import Any, Callable
 
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import Ridge
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+
+from sklearn.model_selection import TimeSeriesSplit
 
 from .config import (
     ASSET_KEYS,
+    FEATURE_COVERAGE_MIN,
     FORWARD_DAYS,
     FUTURE_HORIZONS,
     MARKET_KEYS,
@@ -20,6 +20,8 @@ from .config import (
     MODELS_DIR,
     RANDOM_STATE,
     SECTOR_KEYS,
+    WALK_FORWARD_MIN_TEST,
+    WALK_FORWARD_SPLITS,
     series_by_key,
 )
 from .process import load_events
@@ -30,28 +32,30 @@ FEATURE_CANDIDATES = [
     "us_real_10y", "us_real_3m",
     "us_cpi_yoy", "kr_cpi_yoy",
     "usdkkrw_mom_21", "usdkkrw_mom_63",
-    "dxy_mom_21", "vix_mom_21", "vix",
+    "dxy_mom_21", "vix_mom_21", "vix", "vix_high",
+    "curve_inverted", "risk_off",
     "gold_mom_21", "gold_mom_63",
     "sp500_mom_21", "sp500_mom_63", "nasdaq_mom_21", "nasdaq_mom_63",
     "kospi_mom_21", "kosdaq_mom_21",
     "bitcoin_mom_21", "bitcoin_mom_63",
     "us_semi_mom_21", "us_finance_mom_21",
-    "event_war", "event_disease", "event_tech", "event_crisis",
+    "event_war", "event_disease", "event_tech",
+    "event_crisis", "event_geopolitics", "event_policy",
 ]
+
+EstimatorFactory = Callable[[], Any]
 
 
 def _feature_matrix(features: pd.DataFrame) -> pd.DataFrame:
     cols = [c for c in FEATURE_CANDIDATES if c in features.columns]
-    x = features[cols].copy()
-    if "bitcoin_mom_21" in x:
-        x["bitcoin_mom_21"] = x["bitcoin_mom_21"].fillna(0.0)
-    if "bitcoin_mom_63" in x:
-        x["bitcoin_mom_63"] = x["bitcoin_mom_63"].fillna(0.0)
-    return x
+    return features[cols].copy()
 
 
-def _forward_return(price: pd.Series, days: int = FORWARD_DAYS) -> pd.Series:
-    return price.shift(-days) / price - 1.0
+def _forward_log_return(price: pd.Series, days: int = FORWARD_DAYS) -> pd.Series:
+    future = price.shift(-days)
+    ratio = future / price
+    ratio = ratio.where(ratio > 0)
+    return np.log(ratio)
 
 
 def _horizon_label(days: int) -> str:
@@ -69,40 +73,125 @@ def _mom_col(key: str, days: int) -> str:
     return f"{key}_mom_21"
 
 
+def _make_estimator() -> Any:
+    try:
+        import lightgbm as lgb
+
+        return lgb.LGBMRegressor(
+            n_estimators=120,
+            learning_rate=0.05,
+            max_depth=4,
+            num_leaves=15,
+            min_child_samples=40,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_lambda=1.0,
+            random_state=RANDOM_STATE,
+            verbosity=-1,
+            n_jobs=1,
+        )
+    except ImportError:
+        from sklearn.ensemble import HistGradientBoostingRegressor
+
+        return HistGradientBoostingRegressor(
+            max_depth=4,
+            learning_rate=0.05,
+            max_iter=120,
+            min_samples_leaf=40,
+            l2_regularization=1.0,
+            random_state=RANDOM_STATE,
+        )
+
+
+def _prepare_xy(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
+    df = pd.concat([x, y.rename("y")], axis=1)
+    df = df.dropna(subset=["y"])
+    feat = df.drop(columns=["y"])
+    coverage = feat.notna().mean(axis=1)
+    df = df.loc[coverage >= FEATURE_COVERAGE_MIN]
+    return df
+
+
+def _r2_hit(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float]:
+    ss_res = float(np.sum((y_true - y_pred) ** 2))
+    ss_tot = float(np.sum((y_true - y_true.mean()) ** 2)) or np.nan
+    r2 = 1.0 - ss_res / ss_tot if ss_tot else np.nan
+    hit = float(np.mean(np.sign(y_pred) == np.sign(y_true)))
+    return (float(r2) if r2 == r2 else -1.0), hit
+
+
+def _walk_forward(
+    factory: EstimatorFactory,
+    x: pd.DataFrame,
+    y: pd.Series,
+    embargo: int,
+) -> dict[str, float] | None:
+    n = len(x)
+    n_splits = WALK_FORWARD_SPLITS
+    min_train = MIN_HISTORY_DAYS
+    if n < min_train + WALK_FORWARD_MIN_TEST * 2:
+        return None
+    splitter = TimeSeriesSplit(n_splits=n_splits)
+    oos_pred: list[np.ndarray] = []
+    oos_true: list[np.ndarray] = []
+    n_folds = 0
+    for train_idx, test_idx in splitter.split(x):
+        cutoff = int(test_idx[0]) - max(embargo, 0)
+        train_idx = train_idx[train_idx < max(cutoff, 0)]
+        if len(train_idx) < min_train or len(test_idx) < WALK_FORWARD_MIN_TEST:
+            continue
+        model = factory()
+        model.fit(x.iloc[train_idx], y.iloc[train_idx])
+        pred = np.asarray(model.predict(x.iloc[test_idx]), dtype=float)
+        oos_pred.append(pred)
+        oos_true.append(y.iloc[test_idx].to_numpy(dtype=float))
+        n_folds += 1
+    if n_folds == 0:
+        return None
+    pred = np.concatenate(oos_pred)
+    true = np.concatenate(oos_true)
+    r2, hit = _r2_hit(true, pred)
+    return {
+        "test_r2": r2,
+        "hit_rate": hit,
+        "n_folds": float(n_folds),
+        "n_oos": float(len(true)),
+        "test_mean_pred": float(np.mean(pred)),
+        "test_mean_actual": float(np.mean(true)),
+    }
+
+
 def _train_one_horizon(
     x: pd.DataFrame,
     panel: pd.DataFrame,
     targets: list[str],
     days: int,
-) -> tuple[dict[str, Pipeline], dict[str, dict[str, float]]]:
-    models: dict[str, Pipeline] = {}
+) -> tuple[dict[str, Any], dict[str, dict[str, float]]]:
+    models: dict[str, Any] = {}
     metrics: dict[str, dict[str, float]] = {}
     for key in targets:
-        y = _forward_return(panel[key], days)
-        df = pd.concat([x, y.rename("y")], axis=1).dropna()
+        y = _forward_log_return(panel[key], days)
+        df = _prepare_xy(x, y)
         if len(df) < MIN_HISTORY_DAYS:
             continue
-        split = int(len(df) * 0.8)
-        x_train, x_test = df.drop(columns=["y"]).iloc[:split], df.drop(columns=["y"]).iloc[split:]
-        y_train, y_test = df["y"].iloc[:split], df["y"].iloc[split:]
-        pipe = Pipeline([
-            ("scaler", StandardScaler()),
-            ("ridge", Ridge(alpha=5.0, random_state=RANDOM_STATE)),
-        ])
-        pipe.fit(x_train, y_train)
-        pred = pipe.predict(x_test)
-        ss_res = float(np.sum((y_test - pred) ** 2))
-        ss_tot = float(np.sum((y_test - y_test.mean()) ** 2)) or np.nan
-        r2 = 1.0 - ss_res / ss_tot if ss_tot else np.nan
-        hit = float(np.mean(np.sign(pred) == np.sign(y_test)))
-        models[key] = pipe
-        metrics[key] = {
-            "n": float(len(df)),
-            "test_r2": float(r2) if r2 == r2 else 0.0,
-            "hit_rate": hit,
-            "test_mean_pred": float(np.mean(pred)),
-            "test_mean_actual": float(y_test.mean()),
-        }
+        x_all = df.drop(columns=["y"])
+        y_all = df["y"]
+        wf = _walk_forward(_make_estimator, x_all, y_all, embargo=days)
+        model = _make_estimator()
+        model.fit(x_all, y_all)
+        models[key] = model
+        if wf is None:
+            metrics[key] = {
+                "n": float(len(df)),
+                "test_r2": -1.0,
+                "hit_rate": 0.5,
+                "n_folds": 0.0,
+                "n_oos": 0.0,
+                "test_mean_pred": float("nan"),
+                "test_mean_actual": float("nan"),
+            }
+        else:
+            metrics[key] = {"n": float(len(df)), **wf}
     return models, metrics
 
 
@@ -113,7 +202,7 @@ def train_models(panel: pd.DataFrame, features: pd.DataFrame) -> dict[str, Any]:
     for _hid, days, _label in FUTURE_HORIZONS:
         models, metrics = _train_one_horizon(x, panel, targets, days)
         by_horizon[str(days)] = {"models": models, "metrics": metrics}
-        print(f"[model] horizon {days}d n_targets={len(models)}")
+        print(f"[model] horizon {days}d n_targets={len(models)}", flush=True)
     default = by_horizon.get(str(FORWARD_DAYS)) or next(iter(by_horizon.values()))
     payload = {
         "models": default["models"],
@@ -121,8 +210,10 @@ def train_models(panel: pd.DataFrame, features: pd.DataFrame) -> dict[str, Any]:
         "features": list(x.columns),
         "by_horizon": by_horizon,
         "default_days": FORWARD_DAYS,
+        "estimator": "lightgbm",
+        "target": "log_return",
     }
-    joblib.dump(payload, MODELS_DIR / "ridge_bundle.joblib")
+    joblib.dump(payload, MODELS_DIR / "model_bundle.joblib")
     (MODELS_DIR / "metrics.json").write_text(
         json.dumps({k: v["metrics"] for k, v in by_horizon.items()}, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -143,19 +234,20 @@ def _horizon_slice(bundle: dict[str, Any], days: int) -> dict[str, Any]:
 
 
 def load_models() -> dict[str, Any]:
-    path = MODELS_DIR / "ridge_bundle.joblib"
-    if not path.exists():
-        raise FileNotFoundError("학습된 모델이 없습니다. 먼저 히스토리 파이프라인을 실행하세요.")
-    return joblib.load(path)
+    for name in ("model_bundle.joblib", "lgbm_bundle.joblib", "ridge_bundle.joblib"):
+        path = MODELS_DIR / name
+        if path.exists():
+            return joblib.load(path)
+    raise FileNotFoundError("학습된 모델이 없습니다. 먼저 히스토리 파이프라인을 실행하세요.")
 
 
 def _score_latest(bundle: dict[str, Any], features: pd.DataFrame) -> dict[str, float]:
-    x = _feature_matrix(features).dropna()
+    x = _feature_matrix(features)
     if x.empty:
         return {}
     row = x.iloc[[-1]]
     cols = bundle["features"]
-    row = row.reindex(columns=cols, fill_value=0.0)
+    row = row.reindex(columns=cols)
     scores = {}
     for key, model in bundle["models"].items():
         try:
@@ -212,6 +304,13 @@ def _regime(features: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def _blend_score(pred: float | None, mom: float, r2: float, hit: float) -> float:
+    if pred is None or r2 != r2 or r2 < 0:
+        return mom
+    model_w = min(0.45, max(0.15, (hit - 0.5) * 2))
+    return model_w * pred + (1.0 - model_w) * mom
+
+
 def allocate(
     panel: pd.DataFrame,
     features: pd.DataFrame,
@@ -224,54 +323,28 @@ def allocate(
     raw_scores = _score_latest(slice_, features)
     metrics = slice_.get("metrics", {})
     last = features.iloc[-1]
-    adj_scale = min(1.0, (21 / max(days, 1)) ** 0.5)
+    all_keys = list(dict.fromkeys(list(ASSET_KEYS) + list(MARKET_KEYS) + list(SECTOR_KEYS)))
     scores: dict[str, float] = {}
-    for key, pred in raw_scores.items():
-        hit = float((metrics.get(key) or {}).get("hit_rate", 0.5))
-        r2 = float((metrics.get(key) or {}).get("test_r2", -1.0))
+    for key in all_keys:
+        if key not in panel.columns:
+            continue
         mom_raw = last.get(_mom_col(key, days), last.get(f"{key}_mom_21", 0.0))
         mom = float(mom_raw) if mom_raw == mom_raw else 0.0
         mom = float(np.clip(mom, -0.15, 0.15))
-        model_w = 0.15 if r2 < 0 else min(0.45, max(0.15, (hit - 0.5) * 2))
-        scores[key] = model_w * pred + (1.0 - model_w) * mom
+        hit = float((metrics.get(key) or {}).get("hit_rate", 0.5))
+        r2 = float((metrics.get(key) or {}).get("test_r2", -1.0))
+        pred = raw_scores.get(key)
+        scores[key] = _blend_score(pred, mom, r2, hit)
+
     regime = _regime(features)
     events = _active_events(features.index.max())
     meta = series_by_key()
 
-    def adj(key: str, base: float) -> float:
-        s = base
-        bump = adj_scale
-        if regime["risk_off"] and key in {"gold"}:
-            s += 0.015 * bump
-        if regime["risk_off"] and key in {"kosdaq", "nasdaq", "bitcoin"}:
-            s -= 0.01 * bump
-        if regime["easing"] and key in {"gold", "bitcoin", "nasdaq", "kosdaq"}:
-            s += 0.01 * bump
-        if regime["krw_strong"] and key in {"kospi", "kr_semi", "kr_ship"}:
-            s -= 0.008 * bump
-        if regime["krw_weak"] and key in {"kospi", "kr_semi", "kr_ship"}:
-            s += 0.008 * bump
-        if regime["inverted_curve"] and key in {"us_finance", "kr_finance"}:
-            s -= 0.006 * bump
-        if not regime["inverted_curve"] and key in {"us_finance", "kr_finance"}:
-            s += 0.004 * bump
-        for ev in events:
-            bias = ev.get("bias") or {}
-            if key in bias:
-                s += bump * {"positive": 0.01, "negative": -0.01, "mixed": 0.0, "up": 0.005}.get(bias[key], 0.0)
-            if bias.get("stocks") and key in ASSET_KEYS + MARKET_KEYS and key not in {"gold", "bitcoin"}:
-                s += bump * {"positive": 0.008, "negative": -0.008, "mixed": 0.0}.get(bias["stocks"], 0.0)
-        return s
-
-    asset_scores = {k: adj(k, scores.get(k, 0.0)) for k in ASSET_KEYS if k in scores or k in panel.columns}
-    for k in list(asset_scores):
-        if k not in scores:
-            asset_scores[k] = adj(k, 0.0)
-
+    asset_scores = {k: scores.get(k, 0.0) for k in ASSET_KEYS if k in scores or k in panel.columns}
     ranked_assets = sorted(asset_scores.items(), key=lambda kv: kv[1], reverse=True)
     pick_asset = ranked_assets[0][0] if ranked_assets else "gold"
 
-    market_scores = {k: adj(k, scores.get(k, 0.0)) for k in MARKET_KEYS}
+    market_scores = {k: scores.get(k, 0.0) for k in MARKET_KEYS if k in scores or k in panel.columns}
     market_pick = max(market_scores, key=market_scores.get) if market_scores else None
     sector_pool = [k for k in SECTOR_KEYS if k in scores or k in panel.columns]
     if market_pick in {"kospi", "kosdaq"}:
@@ -279,7 +352,7 @@ def allocate(
     else:
         prefer = [k for k in sector_pool if k.startswith("us_")]
     use = prefer or sector_pool
-    sector_scores = {k: adj(k, scores.get(k, 0.0)) for k in use}
+    sector_scores = {k: scores.get(k, 0.0) for k in use}
     sector_pick = max(sector_scores, key=sector_scores.get) if sector_scores else None
     if pick_asset not in MARKET_KEYS:
         chosen_market, chosen_sector = None, None
@@ -329,15 +402,17 @@ def _forecast_tree(report: dict[str, Any]) -> dict[str, Any]:
     stage1 = "금" if asset == "gold" else "비트코인" if asset == "bitcoin" else "주식"
     market = report.get("if_stocks_market") or report.get("market")
     sector = report.get("if_stocks_sector") or report.get("sector")
-    stock = KOSPI_STOCKS.get(sector) if sector else None
+    etf = KOSPI_STOCKS.get(sector) if sector else None
     reasons = []
     regime = report.get("regime") or {}
     if regime.get("krw_strong"):
-        reasons.append("최근 원화 강세 → 코스피 수출주(반도체·조선) 감점")
+        reasons.append("최근 원화 강세 — 수출주 실적 눈높이에는 부담일 수 있음")
     if regime.get("easing"):
-        reasons.append("단기금리 하락 → 금·비트코인·성장주 가점")
+        reasons.append("단기금리 하락 — 금·성장 자산에 우호적일 수 있는 국면")
     if regime.get("risk_off"):
-        reasons.append("위험회피 국면 → 금 가점, 코스닥·나스닥·비트코인 감점")
+        reasons.append("VIX 상승 또는 커브 역전 — 위험회피 성격이 강한 국면")
+    if regime.get("inverted_curve"):
+        reasons.append("장단기 금리 역전 — 금융 섹터에 부담이 될 수 있음")
     for ev in report.get("active_events") or []:
         reasons.append(f"진행 이슈: {ev.get('name_ko')}")
     kospi_pick = market == "kospi"
@@ -348,11 +423,11 @@ def _forecast_tree(report: dict[str, Any]) -> dict[str, Any]:
         "stage2_key": market,
         "stage3_sector": report.get("if_stocks_sector_label") or report.get("sector_label"),
         "stage3_key": sector,
-        "stage4_stock": stock["name"] if kospi_pick and stock else None,
-        "stage4_ticker": stock["ticker"] if kospi_pick and stock else None,
+        "stage4_stock": etf["name"] if kospi_pick and etf else None,
+        "stage4_ticker": etf["ticker"] if kospi_pick and etf else None,
         "stage4_note": (
-            "코스피 업종 대용 대표주입니다. 동일 업종 ETF·바스켓으로 나눠 담는 편이 안전합니다."
-            if kospi_pick and stock
+            "코스피 업종은 개별 종목이 아니라 해당 섹터 ETF 수익률로 평가합니다."
+            if kospi_pick and etf
             else None
         ),
         "reasons": reasons,
