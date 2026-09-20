@@ -103,13 +103,20 @@
     "role": "User",
     "id": "gustjd9716@hyundailivart.co.kr",
     "hash": "8ab1a9dd0ffc343a93f6b49ab38d6a8a0849e9f4a280c7f0958845cf1c3b9384",
-    "updated": 1788972875155,
+    "updated": 1789915674281,
     "wrap": {
       "v": 1,
       "iter": 210000,
-      "salt": "1S4/7rP4GF6ejB07jtfMZw==",
-      "iv": "Ee9ipNT8FctB+7oN",
-      "ct": "ORby6rXnMV3R+cc47O9lUbFI+uaeyTYZEFeulxTv1wubIFHYn2pR22KcBidN8I+cH/HZVdqw6TIdmMatuIUKx2K4MKtfLy0D4kTqWX0iJMDoEtb6uLUqQYaJ1H690StTREzI3egS7YlQxvZMrQ=="
+      "salt": "qri4A5KaN7bbvi/n65pTCg==",
+      "iv": "g5X5u3W81uFDbzo4",
+      "ct": "AJLIHS6gKn04tI4gBtG693+3fjeqAmzHdHaga0Win/fny+A8kzmXpcDocebYgOt7OTt1BDS5MeOuV37EGAAZubrqO+WPvxKzSTw4OaDVCoE6yi/g7H8rTIHP20hs+PR+zMshl2XPPnXI7o1DUw=="
+    },
+    "pwBox": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "Ush7JtCpzVfMgcZU0ZJKtw==",
+      "iv": "Z+AGSvBwwORV2+Jr",
+      "ct": "p/dxRS4161XHIwGQF30SvIwC+1vduVwBOUssjA=="
     }
   },
   {
