@@ -1,19 +1,25 @@
 {
   "gustjd9716@hyundailivart.co.kr": {
     "categories": [
-      "stock"
+      "stock",
+      "others"
     ],
     "keywords": {
       "gold": [],
       "stock": [
-        "펩트론",
-        "학회"
+        "삼성전자",
+        "하이닉스",
+        "AI"
       ],
       "bitcoin": [],
-      "others": []
+      "others": [
+        "AI",
+        "GPT",
+        "리바트"
+      ]
     },
     "active": true,
-    "updated": 1788972931811
+    "updated": 1789915720241
   },
   "mir8834@daum.net": {
     "categories": [
