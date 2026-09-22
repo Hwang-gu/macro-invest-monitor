@@ -37,5 +37,20 @@
     },
     "active": true,
     "updated": 1789611900000
+  },
+  "2306963@hyundailivart.co.kr": {
+    "categories": [
+      "stock"
+    ],
+    "keywords": {
+      "gold": [],
+      "stock": [
+        "Etf"
+      ],
+      "bitcoin": [],
+      "others": []
+    },
+    "active": true,
+    "updated": 1790037257960
   }
 }
