@@ -278,5 +278,25 @@
       "iv": "tc7SJn1PxGXCnLjf",
       "ct": "fMxBMojwaEIjya9Uxfa58FI="
     }
+  },
+  {
+    "role": "User",
+    "id": "kdk@hyundailivart.co.kr",
+    "hash": "d38706682311e1513dadcf48b375871e53cf8393df8245fbab7483d7de81f07c",
+    "updated": 1790563337312,
+    "wrap": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "MLnJtyGvU6BANWpQCsLJLg==",
+      "iv": "rFF0G/jcZ5rHRWQd",
+      "ct": "opr0TBPcKTAhfRq6Np77NuUVIRMoQKQSw+C9LlRcS/M5LERR4K5ZUec/ubW8WGJnEVZlClJw75ymgM4jtzHdv1nd3fOZQ2Bbto/SpIA397Ppkw0bmEZrJoEU/3FFzUyBvnDKFRACrM9YChf5gQ=="
+    },
+    "pwBox": {
+      "v": 1,
+      "iter": 210000,
+      "salt": "V4PYAz1HGWMDJlZ/QZkYnA==",
+      "iv": "ohO8wb4TJwC6405p",
+      "ct": "gw0teoUDlSv0GhN47+ttnSg="
+    }
   }
 ]
