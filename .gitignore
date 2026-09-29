@@ -17,6 +17,7 @@ data/reports/*
 !data/reports/app/
 data/reports/app/sync.js
 !data/reports/latest.json
+!data/reports/mail_sent.txt
 *.parquet
 *.joblib
 
