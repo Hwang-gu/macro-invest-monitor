@@ -74,7 +74,10 @@ def run(mode: str = "daily", skip_collect: bool = False) -> dict:
     print(f"엑셀: {WORKBOOK_PATH}")
     print(f"브리핑: {BRIEF_HTML}")
     print(f"모바일앱: {APP_DIR / 'index.html'}")
-    print(send_brief_if_configured(report))
+    mail_msg = send_brief_if_configured(report)
+    print(mail_msg)
+    if mail_msg.startswith("메일 발송 실패") or "발송하지 못했습니다" in mail_msg or "보내지 않았습니다" in mail_msg:
+        print(f"::error::{mail_msg}")
     return report
 
 

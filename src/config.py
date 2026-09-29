@@ -169,12 +169,44 @@ def ted_accounts() -> list[dict[str, str]]:
     return accounts
 
 
+def _smtp_host_for_address(address: str) -> str:
+    email = address.lower()
+    if email.endswith("@naver.com"):
+        return "smtp.naver.com"
+    if email.endswith("@gmail.com") or email.endswith("@googlemail.com"):
+        return "smtp.gmail.com"
+    if email.endswith("@daum.net") or email.endswith("@hanmail.net"):
+        return "smtp.daum.net"
+    return ""
+
+
 def mail_settings() -> dict[str, str]:
+    host = os.getenv("SMTP_HOST", "").strip()
+    port = os.getenv("SMTP_PORT", "").strip()
+    user = os.getenv("SMTP_USER", "").strip()
+    password = os.getenv("SMTP_PASSWORD", "").strip()
+    mail_from = os.getenv("MAIL_FROM", "").strip()
+    mail_to = os.getenv("MAIL_TO", "").strip()
+    manager_id = os.getenv("TED_MANAGER_ID", "").strip()
+    manager_pw = os.getenv("TED_MANAGER_PW", "").strip()
+
+    if not user and "@" in manager_id:
+        user = manager_id
+    if not mail_from:
+        mail_from = user
+    if not mail_to and "@" in manager_id:
+        mail_to = manager_id
+    if not host:
+        host = _smtp_host_for_address(user or mail_from or mail_to)
+    if not port:
+        port = "465" if host in {"smtp.naver.com", "smtp.daum.net"} else "587"
+    if not password and user and manager_id and user.lower() == manager_id.lower():
+        password = manager_pw
     return {
-        "host": os.getenv("SMTP_HOST", "").strip(),
-        "port": os.getenv("SMTP_PORT", "587").strip(),
-        "user": os.getenv("SMTP_USER", "").strip(),
-        "password": os.getenv("SMTP_PASSWORD", "").strip(),
-        "mail_from": os.getenv("MAIL_FROM", "").strip(),
-        "mail_to": os.getenv("MAIL_TO", "").strip(),
+        "host": host,
+        "port": port,
+        "user": user,
+        "password": password,
+        "mail_from": mail_from,
+        "mail_to": mail_to,
     }

@@ -2,8 +2,10 @@ name: daily-update
 
 on:
   schedule:
-    # 한국시간 매일 07:00 (미국 장 마감 이후)
-    - cron: "0 22 * * *"
+    # GitHub cron은 지연될 수 있어 두 번 돌립니다. 같은 기준일은 메일을 한 번만 보냅니다.
+    # 한국시간 06:00, 07:30 (미국 장 마감 이후)
+    - cron: "0 21 * * *"
+    - cron: "30 22 * * *"
   workflow_dispatch:
 
 permissions:
@@ -26,6 +28,7 @@ jobs:
       - name: Install
         run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
       - name: Collect and rebuild
+        id: rebuild
         env:
           BOK_API_KEY: ${{ secrets.BOK_API_KEY }}
           TED_MANAGER_ID: ${{ secrets.TED_MANAGER_ID }}
@@ -33,12 +36,32 @@ jobs:
           TED_USER_ID: ${{ secrets.TED_USER_ID }}
           TED_USER_PW: ${{ secrets.TED_USER_PW }}
           TED_SYNC_TOKEN: ${{ secrets.TED_SYNC_TOKEN }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
         run: python -m src --mode daily
+      - name: Send briefing email
+        if: always() && steps.rebuild.outcome == 'success'
+        continue-on-error: true
+        env:
+          TED_MANAGER_ID: ${{ secrets.TED_MANAGER_ID }}
+          TED_MANAGER_PW: ${{ secrets.TED_MANAGER_PW }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python -m src.notify
       - name: Save data for next run
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/raw data/events.json data/ted_users.json data/ted_ads.json data/ted_newsletters.json data/ted_notices.json data/ads data/ted_sync_box.json data/reports/latest.json data/reports/app
+          if [ -f data/reports/mail_sent.txt ]; then git add data/reports/mail_sent.txt; fi
           git diff --cached --quiet || git commit -m "daily data $(date -u +%Y-%m-%d)"
           git push
       - name: Upload Pages artifact

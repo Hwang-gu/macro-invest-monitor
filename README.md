@@ -85,7 +85,7 @@ streamlit run app/dashboard.py
 - `data/reports/daily_brief.html` — 이슈 음영이 입혀진 그래프와 근거. 브라우저로 열면 됩니다.
 - `streamlit run app/dashboard.py` — 같은 그래프를 대화형으로 봅니다.
 
-`.env`에 SMTP와 `MAIL_TO`를 넣으면 엑셀+HTML을 메일로 보냅니다. Gmail은 **앱 비밀번호**가 필요합니다.
+`.env` 또는 GitHub Secrets의 SMTP / `MAIL_TO`로 엑셀+HTML 브리핑을 보냅니다. 비어 있으면 매니저 계정(`TED_MANAGER_ID`)으로 추정합니다. Gmail·네이버는 앱 비밀번호가 필요합니다.
 
 ## 폴더
 
