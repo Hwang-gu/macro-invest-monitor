@@ -166,31 +166,56 @@ def fetch_hot_news(keyword: str, limit: int = NEWS_PER_KEYWORD) -> list[dict[str
 
 def build_html(subscriber: dict[str, Any], asof_ko: str | None = None) -> str:
     del asof_ko
+    spacer = "<p style='margin:0;padding:0;line-height:12px;font-size:12px;'>&nbsp;</p>"
     parts = [
         "<div style=\"font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;"
-        "font-size:14px;line-height:1.7;color:#222;max-width:720px\">",
-        "<p>Good morning Sir. This is Marchisio.</p>",
+        "font-size:14pt;line-height:1.65;color:#222;max-width:720px\">",
+        "<p style='margin:0 0 6px 0;'>Good morning Sir. This is Marchisio.</p>",
+        spacer,
+        spacer,
     ]
+    first_kw = True
     for _cat, word in subscriber["items"]:
-        parts.append(f"<p><b>&lt; {html.escape(word)} &gt;</b></p>")
+        if not first_kw:
+            parts.append(spacer)
+            parts.append(spacer)
+        first_kw = False
+        parts.append(
+            "<p style='margin:18px 0 10px 0;font-size:15pt;font-weight:bold;'>"
+            f"&lt; {html.escape(word)} &gt;</p>"
+        )
+        parts.append(spacer)
         news = fetch_hot_news(word)
         if not news:
-            parts.append("<p>오늘 관련 뉴스를 찾지 못했습니다.</p>")
+            parts.append("<p style='margin:8px 0 16px 0;'>오늘 관련 뉴스를 찾지 못했습니다.</p>")
             continue
         for item in news:
             headline = html.escape(_headline(item))
             url = html.escape(item["url"], quote=True)
-            parts.append(f"<p>📌 <a href='{url}'>{headline}</a></p>")
+            parts.append(
+                "<p style='margin:18px 0 8px 0;font-size:16pt;font-weight:bold;line-height:1.45;'>"
+                f"📌 <a href='{url}' style='font-size:16pt;font-weight:bold;color:#1155cc;"
+                f"text-decoration:underline;'>{headline}</a></p>"
+            )
             for line in item.get("summary") or _fallback_summary(item):
-                parts.append(f"<p>- {html.escape(line)}</p>")
-            parts.append(f"<p>URL: <a href='{url}'>{html.escape(item['url'])}</a></p>")
+                parts.append(
+                    f"<p style='margin:3px 0;font-size:14pt;'>- {html.escape(line)}</p>"
+                )
+            parts.append(
+                "<p style='margin:6px 0 16px 0;font-size:14pt;'>"
+                f"URL: <a href='{url}'>{html.escape(item['url'])}</a></p>"
+            )
     parts.append("</div>")
     return "".join(parts)
 
 
 def build_text(subscriber: dict[str, Any]) -> str:
-    lines = ["Good morning Sir. This is Marchisio.", ""]
+    lines = ["Good morning Sir. This is Marchisio.", "", ""]
+    first_kw = True
     for _cat, word in subscriber["items"]:
+        if not first_kw:
+            lines.append("")
+        first_kw = False
         lines.append(f"< {word} >")
         lines.append("")
         news = fetch_hot_news(word)
@@ -204,7 +229,7 @@ def build_text(subscriber: dict[str, Any]) -> str:
                 lines.append(f"- {line}")
             lines.append(f"URL: {item['url']}")
             lines.append("")
-    return "\n".join(lines).strip() + "\n"
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _headline(item: dict[str, Any]) -> str:
