@@ -67,19 +67,46 @@ def _recipients(cfg: dict[str, str]) -> list[str]:
 
 
 def _connect(cfg: dict[str, str]) -> smtplib.SMTP:
-    port = int(cfg["port"] or "587")
-    host = cfg["host"]
-    context = ssl.create_default_context()
-    if port == 465:
-        smtp = smtplib.SMTP_SSL(host, port, timeout=60, context=context)
+    user = (cfg.get("user") or "").strip()
+    host = (cfg.get("host") or "").strip()
+    if user.lower().endswith("@gmail.com") or user.lower().endswith("@googlemail.com"):
+        host = "smtp.gmail.com"
+    elif user.lower().endswith("@naver.com"):
+        host = "smtp.naver.com"
+    port_raw = int(cfg.get("port") or "0")
+    if user.lower().endswith("@gmail.com") or user.lower().endswith("@googlemail.com"):
+        attempts: list[tuple[int, bool]] = [(587, False), (465, True)]
+        if port_raw in {587, 465}:
+            attempts.sort(key=lambda item: 0 if item[0] == port_raw else 1)
+    elif port_raw == 465:
+        attempts = [(465, True), (587, False)]
     else:
-        smtp = smtplib.SMTP(host, port, timeout=60)
-        smtp.ehlo()
-        smtp.starttls(context=context)
-        smtp.ehlo()
-    if cfg["user"] and cfg["password"]:
-        smtp.login(cfg["user"], cfg["password"])
-    return smtp
+        attempts = [(port_raw or 587, False), (465, True)]
+
+    last: Exception | None = None
+    for port, use_ssl in attempts:
+        smtp: smtplib.SMTP | None = None
+        try:
+            context = ssl.create_default_context()
+            if use_ssl:
+                smtp = smtplib.SMTP_SSL(host, port, timeout=60, context=context)
+            else:
+                smtp = smtplib.SMTP(host, port, timeout=60)
+                smtp.ehlo()
+                smtp.starttls(context=context)
+                smtp.ehlo()
+            if cfg["user"] and cfg["password"]:
+                smtp.login(cfg["user"], cfg["password"])
+            return smtp
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if smtp is not None:
+                try:
+                    smtp.close()
+                except Exception:  # noqa: BLE001
+                    pass
+    assert last is not None
+    raise last
 
 
 def send_brief_if_configured(report: dict, html_path: Path | None = None, xlsx_path: Path | None = None) -> str:
@@ -106,16 +133,14 @@ def send_brief_if_configured(report: dict, html_path: Path | None = None, xlsx_p
         return _write_status(False, "발신 계정 또는 뉴스레터 신청자가 없어 메일을 보내지 않았습니다.")
 
     attachments: list[tuple[str, bytes]] = []
-    for path in (html_path, xlsx_path):
-        if path is None or not path.exists():
-            continue
-        attachments.append((path.name, path.read_bytes()))
+    if xlsx_path is not None and xlsx_path.exists():
+        attachments.append((xlsx_path.name, xlsx_path.read_bytes()))
 
     intro = (
         f"<p>기준일 {asof}. 1순위 <b>{pick}</b>."
         f" 주식이라면 {market} / {sector}.</p>"
         f"<pre style='white-space:pre-wrap;font-family:sans-serif'>{body}</pre>"
-        "<p>엑셀 장부와 HTML 브리핑을 첨부했습니다. 연구용이며 투자 권유가 아닙니다.</p>"
+        "<p>엑셀 장부를 첨부했습니다. 연구용이며 투자 권유가 아닙니다.</p>"
         "<p>Ted Investment 뉴스레터 신청자에게 보내는 메일입니다.</p>"
     )
 
