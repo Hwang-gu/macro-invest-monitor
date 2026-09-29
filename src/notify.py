@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import smtplib
 import ssl
 import time
@@ -66,6 +67,33 @@ def _recipients(cfg: dict[str, str]) -> list[str]:
     return addrs
 
 
+def _ipv4_socket(host: str, port: int, timeout: int) -> socket.socket:
+    last: Exception | None = None
+    for info in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+        family, socktype, proto, _canon, sockaddr = info
+        sock = socket.socket(family, socktype, proto)
+        sock.settimeout(timeout)
+        try:
+            sock.connect(sockaddr)
+            return sock
+        except OSError as exc:
+            last = exc
+            sock.close()
+    raise last or OSError(f"{host}:{port} IPv4 연결 실패")
+
+
+class _SMTP(smtplib.SMTP):
+    def _get_socket(self, host: str, port: int, timeout: float):
+        return _ipv4_socket(host, port, int(timeout or 60))
+
+
+class _SMTP_SSL(smtplib.SMTP_SSL):
+    def _get_socket(self, host: str, port: int, timeout: float):
+        sock = _ipv4_socket(host, port, int(timeout or 60))
+        context = self.context if getattr(self, "context", None) else ssl.create_default_context()
+        return context.wrap_socket(sock, server_hostname=host)
+
+
 def _connect(cfg: dict[str, str]) -> smtplib.SMTP:
     user = (cfg.get("user") or "").strip()
     host = (cfg.get("host") or "").strip()
@@ -89,9 +117,9 @@ def _connect(cfg: dict[str, str]) -> smtplib.SMTP:
         try:
             context = ssl.create_default_context()
             if use_ssl:
-                smtp = smtplib.SMTP_SSL(host, port, timeout=60, context=context)
+                smtp = _SMTP_SSL(host, port, timeout=60, context=context)
             else:
-                smtp = smtplib.SMTP(host, port, timeout=60)
+                smtp = _SMTP(host, port, timeout=60)
                 smtp.ehlo()
                 smtp.starttls(context=context)
                 smtp.ehlo()
@@ -115,7 +143,7 @@ def send_brief_if_configured(report: dict, html_path: Path | None = None, xlsx_p
     if not cfg["host"] or not cfg["user"] or not cfg["password"]:
         return _write_status(
             False,
-            "메일 설정이 없어 발송하지 못했습니다. GitHub Secrets 또는 .env 에 "
+            "메일 설정이 없어 발송하지 못했습니다. GitHub Secrets 에 "
             "SMTP_HOST / SMTP_USER / SMTP_PASSWORD 를 넣으세요. 수신자는 뉴스레터 신청자입니다.",
         )
     if _already_sent(asof):
