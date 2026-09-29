@@ -389,38 +389,32 @@ def _strip_trailing_source(title: str) -> str:
 
 
 def _select_balanced(articles: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
-    pool = _diverse(articles, max(limit * 6, 12))
     picked: list[dict[str, Any]] = []
     used_press: set[str] = set()
-    used_leans: set[str] = set()
 
-    def try_add(row: dict[str, Any], require_new_lean: bool = False) -> bool:
+    def try_add(row: dict[str, Any]) -> bool:
         if row in picked:
             return False
         press = row.get("press_key") or row.get("source") or ""
-        lean = row.get("lean") or "center"
         if press and press in used_press:
-            return False
-        if require_new_lean and lean in used_leans and "center" not in {lean}:
             return False
         if any(_too_similar(row["title"], prev["title"]) for prev in picked):
             return False
         picked.append(row)
         if press:
             used_press.add(press)
-        used_leans.add(lean)
         return True
 
     for lean in ("conservative", "progressive", "center"):
         if len(picked) >= limit:
             break
-        for row in pool:
+        for row in articles:
             if (row.get("lean") or "center") != lean:
                 continue
             if try_add(row):
                 break
 
-    for row in pool:
+    for row in articles:
         if len(picked) >= limit:
             break
         try_add(row)
@@ -429,9 +423,8 @@ def _select_balanced(articles: list[dict[str, Any]], limit: int) -> list[dict[st
         for row in articles:
             if len(picked) >= limit:
                 break
-            if row in picked:
-                continue
-            picked.append(row)
+            if row not in picked:
+                picked.append(row)
     return picked[:limit]
 
 
@@ -451,6 +444,9 @@ def _diverse(articles: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]
             if len(picked) >= limit:
                 break
     return picked
+
+
+def _too_similar(left: str, right: str) -> bool:
     a = _stems(left)
     b = _stems(right)
     if len(a) < 3 or len(b) < 3:
