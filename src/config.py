@@ -194,10 +194,8 @@ def mail_settings() -> dict[str, str]:
         user = manager_id
     if not mail_from:
         mail_from = user
-    if not mail_to and "@" in manager_id:
-        mail_to = manager_id
     if not host:
-        host = _smtp_host_for_address(user or mail_from or mail_to)
+        host = _smtp_host_for_address(user or mail_from)
     if not port:
         port = "465" if host in {"smtp.naver.com", "smtp.daum.net"} else "587"
     if not password and user and manager_id and user.lower() == manager_id.lower():
