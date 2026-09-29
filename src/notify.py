@@ -37,6 +37,16 @@ def _send_mail_enabled() -> bool:
     return os.getenv("TED_SEND_MAIL", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _mail_only() -> str:
+    return os.getenv("TED_MAIL_ONLY", "").strip().lower()
+
+
+def _is_test_send() -> bool:
+    if _mail_only():
+        return True
+    return os.getenv("TED_MAIL_TEST", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _ipv4_socket(host: str, port: int, timeout: int) -> socket.socket:
     last: Exception | None = None
     for info in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
@@ -120,13 +130,19 @@ def send_brief_if_configured(report: dict | None = None, html_path: Path | None 
         )
     if not _send_mail_enabled():
         return _write_status(True, "뉴스레터 발송을 건너뛰었습니다. 예약 발송이 아니거나 발송 허락이 없습니다.")
-    if _already_sent(asof):
+    test_send = _is_test_send()
+    if not test_send and _already_sent(asof):
         return _write_status(True, f"이미 {asof} 뉴스레터를 보냈습니다.")
 
     sender = cfg["mail_from"] or cfg["user"]
     from_name = cfg.get("mail_from_name") or "Claudio Marchisio"
     subscribers = load_subscribers()
+    only = _mail_only()
+    if only:
+        subscribers = [s for s in subscribers if s["email"] == only]
     if not sender or not subscribers:
+        if only:
+            return _write_status(False, f"{only} 뉴스레터 신청 내역이 없어 메일을 보내지 않았습니다.")
         return _write_status(False, "발신 계정 또는 뉴스레터 신청자가 없어 메일을 보내지 않았습니다.")
 
     payloads: list[tuple[str, bytes]] = []
@@ -163,8 +179,11 @@ def send_brief_if_configured(report: dict | None = None, html_path: Path | None 
             f"메일 발송 실패: {len(sent_ok)}/{len(subscribers)}명 성공. {'; '.join(errors)}",
         )
 
-    _mark_sent(asof)
+    if not test_send:
+        _mark_sent(asof)
     sent = f"키워드 뉴스 메일을 신청자 {len(sent_ok)}명에게 보냈습니다."
+    if test_send:
+        sent = f"테스트로 {', '.join(sent_ok)} 에게 키워드 뉴스 메일을 보냈습니다."
     print(sent)
     return _write_status(True, sent)
 
