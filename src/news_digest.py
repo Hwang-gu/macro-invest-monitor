@@ -203,7 +203,7 @@ def build_html(subscriber: dict[str, Any], asof_ko: str | None = None) -> str:
             parts.append(spacer)
         first_kw = False
         parts.append(
-            "<p style='margin:16px 0 8px 0;font-size:9pt;font-weight:bold;'>"
+            "<p style='margin:16px 0 8px 0;font-size:10pt;font-weight:bold;'>"
             f"&lt; {html.escape(word)} &gt;</p>"
         )
         parts.append(spacer)
@@ -215,8 +215,8 @@ def build_html(subscriber: dict[str, Any], asof_ko: str | None = None) -> str:
             headline = html.escape(_headline(item))
             url = html.escape(item["url"], quote=True)
             parts.append(
-                "<p style='margin:16px 0 6px 0;font-size:14pt;font-weight:bold;line-height:1.4;'>"
-                f"📌 <span style='font-size:14pt;font-weight:bold;'>{headline}</span></p>"
+                "<p style='margin:16px 0 6px 0;font-size:12pt;font-weight:bold;line-height:1.4;'>"
+                f"📌 <span style='font-size:12pt;font-weight:bold;'>{headline}</span></p>"
             )
             for line in item.get("summary") or _fallback_summary(item):
                 parts.append(
