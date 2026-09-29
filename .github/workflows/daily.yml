@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TED_SEND_MAIL: ${{ github.event_name == 'schedule' && '1' || inputs.send_mail && '1' || '0' }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

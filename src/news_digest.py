@@ -4,15 +4,14 @@ import html
 import json
 import re
 import time
-import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
-from email.utils import parsedate_to_datetime
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 import requests
+from lxml import html as lhtml
 
-from .config import ROOT
+from .config import ROOT, gemini_api_key
 
 KST = timezone(timedelta(hours=9))
 NEWS_PER_KEYWORD = 3
@@ -23,11 +22,37 @@ CAT_LABELS = {
     "bitcoin": "Bitcoin",
     "others": "Others",
 }
-_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
-)
-_CACHE: dict[str, list[dict[str, str]]] = {}
+PRESS_BY_HOST = {
+    "biz.chosun.com": ("조선비즈", "Chosunbiz"),
+    "www.chosun.com": ("조선일보", "Chosun"),
+    "www.hankyung.com": ("한국경제", "Hankyung"),
+    "www.mk.co.kr": ("매일경제", "MK"),
+    "www.edaily.co.kr": ("이데일리", "edaily.co.kr"),
+    "www.yna.co.kr": ("연합뉴스", "Yonhap"),
+    "www.yonhapnewstv.co.kr": ("연합뉴스TV", "YonhapnewsTV"),
+    "v.daum.net": ("다음", "v.daum.net"),
+    "news.daum.net": ("다음", "daum.net"),
+    "www.inews24.com": ("아이뉴스24", "inews24"),
+    "www.newsis.com": ("뉴시스", "Newsis"),
+    "www.nocutnews.co.kr": ("노컷뉴스", "Nocutnews"),
+    "www.sedaily.com": ("서울경제", "Sedaily"),
+    "www.hankookilbo.com": ("한국일보", "Hankookilbo"),
+    "www.joongang.co.kr": ("중앙일보", "JoongAng"),
+    "www.donga.com": ("동아일보", "Donga"),
+    "www.mt.co.kr": ("머니투데이", "MoneyToday"),
+    "www.fnnews.com": ("파이낸셜뉴스", "Fnnews"),
+    "www.thelec.kr": ("디일렉", "thelec.kr"),
+    "www.investing.com": ("인베스팅닷컴", "Investing.com"),
+}
+_UA = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+    "Referer": "https://www.naver.com/",
+}
+_CACHE: dict[str, list[dict[str, Any]]] = {}
 
 
 def kst_today() -> str:
@@ -37,6 +62,21 @@ def kst_today() -> str:
 def kst_today_ko() -> str:
     today = datetime.now(KST).date()
     return f"{today.year}년 {today.month}월 {today.day}일"
+
+
+def kst_md() -> str:
+    today = datetime.now(KST).date()
+    return f"{today.month}/{today.day}"
+
+
+def mail_subject(subscriber: dict[str, Any]) -> str:
+    labels = [CAT_LABELS[c] for c in subscriber.get("categories") or [] if c in CAT_LABELS]
+    stamp = kst_md()
+    if len(labels) == 1:
+        return f"[Marchisio News] {stamp} {labels[0]}"
+    if labels:
+        return f"[Marchisio News] {stamp} ({', '.join(labels)})"
+    return f"[Marchisio News] {stamp}"
 
 
 def load_subscribers() -> list[dict[str, Any]]:
@@ -113,140 +153,381 @@ def _split_keywords(raw: Any) -> list[str]:
     return [s.strip() for s in str(raw or "").replace("，", ",").split(",") if s.strip()]
 
 
-def fetch_hot_news(keyword: str, limit: int = NEWS_PER_KEYWORD) -> list[dict[str, str]]:
+def fetch_hot_news(keyword: str, limit: int = NEWS_PER_KEYWORD) -> list[dict[str, Any]]:
     cached = _CACHE.get(keyword)
     if cached is not None:
         return cached[:limit]
-    articles = _fetch_google_news(keyword, today_only=True)
+    articles = _fetch_naver_news(keyword)
     if len(articles) < limit:
-        extra = _fetch_google_news(keyword, today_only=False)
-        articles = _merge_unique(articles, extra)
-    articles = articles[:limit]
+        articles = _merge_unique(articles, _fetch_bing_news(keyword))
+    articles = _diverse(articles, limit)
+    _fill_summaries(articles)
     _CACHE[keyword] = articles
     return articles
 
 
-def build_html(subscriber: dict[str, Any], asof_ko: str) -> str:
-    sections: list[str] = [
-        "<div style=\"font-family:'Apple SD Gothic Neo',Malgun Gothic,sans-serif;"
-        "font-size:15px;line-height:1.55;color:#222;max-width:640px\">",
-        f"<p>앱에서 설정하신 관심 키워드 기준, <b>{html.escape(asof_ko)}</b> "
-        "오전 가장 주목받는 뉴스입니다.</p>",
+def build_html(subscriber: dict[str, Any], asof_ko: str | None = None) -> str:
+    del asof_ko
+    parts = [
+        "<div style=\"font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;"
+        "font-size:14px;line-height:1.7;color:#222;max-width:720px\">",
+        "<p>Good morning Sir. This is Marchisio.</p>",
     ]
-    current_cat = ""
-    for cat, word in subscriber["items"]:
-        if cat != current_cat:
-            current_cat = cat
-            sections.append(
-                f"<h2 style='margin:22px 0 8px;font-size:18px'>{html.escape(CAT_LABELS.get(cat, cat))}</h2>"
-            )
-        sections.append(
-            f"<h3 style='margin:14px 0 6px;font-size:16px'>키워드 · {html.escape(word)}</h3>"
-        )
+    for _cat, word in subscriber["items"]:
+        parts.append(f"<p><b>&lt; {html.escape(word)} &gt;</b></p>")
         news = fetch_hot_news(word)
         if not news:
-            sections.append("<p style='color:#666'>오늘 관련 뉴스를 찾지 못했습니다.</p>")
+            parts.append("<p>오늘 관련 뉴스를 찾지 못했습니다.</p>")
             continue
-        sections.append("<ol style='padding-left:20px;margin:0 0 8px'>")
         for item in news:
-            title = html.escape(item["title"])
-            link = html.escape(item["url"], quote=True)
-            meta = " · ".join(p for p in (item.get("source"), item.get("when")) if p)
-            meta_html = f"<br><span style='color:#666;font-size:13px'>{html.escape(meta)}</span>" if meta else ""
-            sections.append(
-                f"<li style='margin:0 0 10px'><a href='{link}'>{title}</a>{meta_html}</li>"
-            )
-        sections.append("</ol>")
-    sections.append(
-        "<p style='margin-top:28px;color:#666;font-size:13px'>"
-        "수신 설정은 Ted Investment 앱의 Apply for news letter에서 바꿀 수 있습니다."
-        "</p></div>"
-    )
-    return "".join(sections)
+            headline = html.escape(_headline(item))
+            url = html.escape(item["url"], quote=True)
+            parts.append(f"<p>📌 <a href='{url}'>{headline}</a></p>")
+            for line in item.get("summary") or _fallback_summary(item):
+                parts.append(f"<p>- {html.escape(line)}</p>")
+            parts.append(f"<p>URL: <a href='{url}'>{html.escape(item['url'])}</a></p>")
+    parts.append("</div>")
+    return "".join(parts)
 
 
-def _fetch_google_news(keyword: str, today_only: bool) -> list[dict[str, str]]:
-    query = _google_query(keyword, today_only)
-    url = (
-        "https://news.google.com/rss/search?q="
-        f"{quote(query)}&hl=ko&gl=KR&ceid=KR:ko"
-    )
+def build_text(subscriber: dict[str, Any]) -> str:
+    lines = ["Good morning Sir. This is Marchisio.", ""]
+    for _cat, word in subscriber["items"]:
+        lines.append(f"< {word} >")
+        lines.append("")
+        news = fetch_hot_news(word)
+        if not news:
+            lines.append("오늘 관련 뉴스를 찾지 못했습니다.")
+            lines.append("")
+            continue
+        for item in news:
+            lines.append(f"📌 {_headline(item)}")
+            for line in item.get("summary") or _fallback_summary(item):
+                lines.append(f"- {line}")
+            lines.append(f"URL: {item['url']}")
+            lines.append("")
+    return "\n".join(lines).strip() + "\n"
+
+
+def _headline(item: dict[str, Any]) -> str:
+    title = (item.get("title") or "").strip()
+    source = (item.get("source") or "").strip()
+    if source and source not in title:
+        return f"{title} - {source}"
+    return title
+
+
+def _fetch_naver_news(keyword: str) -> list[dict[str, Any]]:
+    query = quote(keyword)
+    urls = [
+        f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_opt&sort=0&nso=so:r,p:1d",
+        f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_opt&sort=0",
+    ]
+    articles: list[dict[str, Any]] = []
+    for url in urls:
+        try:
+            resp = requests.get(url, timeout=20, headers=_UA)
+            resp.raise_for_status()
+        except requests.RequestException:
+            continue
+        parsed = _parse_naver_results(resp.text)
+        articles = _merge_unique(articles, parsed)
+        if len(articles) >= NEWS_PER_KEYWORD:
+            break
+        time.sleep(0.2)
+    return articles[:NEWS_PER_KEYWORD]
+
+
+def _parse_naver_results(page: str) -> list[dict[str, Any]]:
     try:
-        resp = requests.get(url, timeout=20, headers={"User-Agent": _UA})
+        doc = lhtml.fromstring(page)
+    except Exception:  # noqa: BLE001
+        return []
+    items: list[dict[str, Any]] = []
+    index: dict[str, int] = {}
+    for anchor in doc.xpath("//a[@href]"):
+        href = _clean_url(anchor.get("href") or "")
+        title = " ".join((anchor.text_content() or "").split())
+        if not href.startswith("http") or len(title) < 8:
+            continue
+        host = (urlparse(href).hostname or "").lower()
+        if "naver.com" in host or "google.com" in host or "bing.com" in host:
+            continue
+        if href in index:
+            row = items[index[href]]
+            cleaned = _clean_headline(title)
+            if len(cleaned) < len(row["title"]) and len(cleaned) >= 10:
+                if len(row["title"]) > len(cleaned) + 10:
+                    row["snippet"] = row.get("snippet") or row["title"]
+                row["title"] = cleaned
+            elif len(title) > len(row["title"]) + 10:
+                row["snippet"] = title
+            continue
+        index[href] = len(items)
+        items.append(
+            {
+                "title": _clean_headline(title),
+                "url": href,
+                "source": _source_from_host(host),
+                "snippet": title if len(title) > 80 else "",
+                "summary": [],
+            }
+        )
+    return items
+
+
+def _fetch_bing_news(keyword: str) -> list[dict[str, Any]]:
+    url = f"https://www.bing.com/news/search?q={quote(keyword)}&format=rss"
+    try:
+        resp = requests.get(url, timeout=20, headers=_UA)
         resp.raise_for_status()
     except requests.RequestException:
         return []
+    import xml.etree.ElementTree as ET
+
     try:
         root = ET.fromstring(resp.content)
     except ET.ParseError:
         return []
-    articles: list[dict[str, str]] = []
-    seen: set[str] = set()
+    articles: list[dict[str, Any]] = []
     for item in root.findall(".//item"):
-        title = _clean_title(item.findtext("title") or "")
-        link = (item.findtext("link") or "").strip()
-        if not title or not link:
+        title = html.unescape((item.findtext("title") or "").strip())
+        link = _clean_url(_unwrap_bing_url(item.findtext("link") or ""))
+        if not title or not link.startswith("http"):
             continue
-        key = re.sub(r"\s+", " ", title).casefold()
-        if key in seen:
+        host = (urlparse(link).hostname or "").lower()
+        if "bing.com" in host or "msn.com" in host:
             continue
-        seen.add(key)
-        source_el = item.find("source")
-        source = (source_el.text or "").strip() if source_el is not None else ""
-        if not source:
-            source = _source_from_title(item.findtext("title") or "")
+        desc = html.unescape(re.sub(r"<[^>]+>", " ", item.findtext("description") or ""))
         articles.append(
             {
                 "title": title,
                 "url": link,
-                "source": source,
-                "when": _format_when(item.findtext("pubDate") or ""),
+                "source": _source_from_host(host),
+                "snippet": " ".join(desc.split()),
+                "summary": [],
             }
         )
-    time.sleep(0.2)
     return articles
 
 
-def _google_query(keyword: str, today_only: bool) -> str:
-    kw = keyword.strip()
-    core = f'"{kw}"' if " " in kw else kw
-    return f"{core} when:1d" if today_only else core
+def _unwrap_bing_url(link: str) -> str:
+    parsed = urlparse(link)
+    qs = dict(parse_qsl(parsed.query))
+    return qs.get("url") or link
+
+
+def _clean_headline(title: str) -> str:
+    title = title.replace("새 창 열림", " ").replace("Keep 저장", " ").replace("Keep", " ")
+    title = re.split(r"새 창", title)[0]
+    title = re.sub(r"\s+", " ", title).strip(" -|")
+    if len(title) > 90:
+        cut = title[:90]
+        if " " in cut:
+            cut = cut.rsplit(" ", 1)[0]
+        title = cut.rstrip(".,…") + "…"
+    return title
+
+
+def _diverse(articles: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    picked: list[dict[str, Any]] = []
+    for row in articles:
+        if any(_too_similar(row["title"], prev["title"]) for prev in picked):
+            continue
+        picked.append(row)
+        if len(picked) >= limit:
+            break
+    if len(picked) < limit:
+        for row in articles:
+            if row in picked:
+                continue
+            picked.append(row)
+            if len(picked) >= limit:
+                break
+    return picked
+
+
+def _too_similar(left: str, right: str) -> bool:
+    a = _stems(left)
+    b = _stems(right)
+    if len(a) < 3 or len(b) < 3:
+        return False
+    overlap = set(a) & set(b)
+    extra = 0
+    for x in a:
+        for y in b:
+            if x == y:
+                continue
+            if min(len(x), len(y)) >= 3 and (x in y or y in x):
+                extra += 1
+                break
+    return len(overlap) + min(extra, 3) >= 4
+
+
+def _stems(text: str) -> set[str]:
+    text = text.replace("美", "").replace("社", "개사")
+    out: set[str] = set()
+    for tok in re.findall(r"[가-힣A-Za-z0-9]{2,}", text):
+        stem = re.sub(r"(에서|으로|에게|까지|부터|하는|된|할|에|로|을|를|이|가|은|는|의)$", "", tok)
+        if len(stem) >= 2:
+            out.add(stem)
+    return out
+    parsed = urlparse(link)
+    qs = dict(parse_qsl(parsed.query))
+    return qs.get("url") or link
 
 
 def _merge_unique(
-    first: list[dict[str, str]], second: list[dict[str, str]]
-) -> list[dict[str, str]]:
-    seen = {re.sub(r"\s+", " ", row["title"]).casefold() for row in first}
+    first: list[dict[str, Any]], second: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    seen = {_norm_title(row["title"]) for row in first}
+    seen_url = {row["url"] for row in first}
     out = list(first)
     for row in second:
-        key = re.sub(r"\s+", " ", row["title"]).casefold()
-        if key in seen:
+        if row["url"] in seen_url or _norm_title(row["title"]) in seen:
             continue
-        seen.add(key)
+        seen.add(_norm_title(row["title"]))
+        seen_url.add(row["url"])
         out.append(row)
     return out
 
 
-def _clean_title(raw: str) -> str:
-    title = html.unescape(raw).strip()
-    title = re.sub(r"\s+[-–—]\s+[^-–—]+$", "", title).strip()
-    return title
+def _norm_title(title: str) -> str:
+    return re.sub(r"\s+", " ", title).casefold()
 
 
-def _source_from_title(raw: str) -> str:
-    title = html.unescape(raw).strip()
-    parts = re.split(r"\s+[-–—]\s+", title)
-    return parts[-1].strip() if len(parts) > 1 else ""
+def _source_from_host(host: str) -> str:
+    if host in PRESS_BY_HOST:
+        ko, en = PRESS_BY_HOST[host]
+        return f"{ko} · {en}"
+    host = host[4:] if host.startswith("www.") else host
+    return host
 
 
-def _format_when(raw: str) -> str:
-    if not raw:
-        return ""
+def _clean_url(url: str) -> str:
+    url = url.strip()
+    parsed = urlparse(url)
+    drop = {"input", "from", "ntt", "did", "sid", "division"}
+    query = [
+        (k, v)
+        for k, v in parse_qsl(parsed.query, keep_blank_values=True)
+        if not k.lower().startswith("utm_") and k.lower() not in drop
+    ]
+    return urlunparse(parsed._replace(query=urlencode(query), fragment=""))
+
+
+def _fill_summaries(articles: list[dict[str, Any]]) -> None:
+    for article in articles:
+        snippet = (article.get("snippet") or "").strip()
+        if len(snippet) < 40:
+            fetched = _page_snippet(article["url"])
+            if fetched:
+                article["snippet"] = fetched
+    generated = _gemini_summaries(articles)
+    for i, article in enumerate(articles):
+        lines = generated.get(i) or _fallback_summary(article)
+        article["summary"] = lines[:3]
+
+
+def _page_snippet(url: str) -> str:
     try:
-        dt = parsedate_to_datetime(raw)
-    except (TypeError, ValueError, IndexError):
+        resp = requests.get(url, timeout=8, headers={**_UA, "Referer": "https://search.naver.com/"})
+        resp.raise_for_status()
+        text = resp.content.decode("utf-8", errors="replace")[:200000]
+    except requests.RequestException:
         return ""
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    local = dt.astimezone(KST)
-    return local.strftime("%m/%d %H:%M")
+    if _looks_broken(text[:500]):
+        return ""
+    for pat in (
+        r'property=["\']og:description["\'][^>]*content=["\']([^"\']+)',
+        r'content=["\']([^"\']+)["\'][^>]*property=["\']og:description["\']',
+        r'name=["\']description["\'][^>]*content=["\']([^"\']+)',
+    ):
+        match = re.search(pat, text, re.I)
+        if match:
+            return html.unescape(re.sub(r"\s+", " ", match.group(1))).strip()
+    return ""
+
+
+def _looks_broken(text: str) -> bool:
+    if not text:
+        return True
+    return bool(re.search(r"(?:ì|í|ë|å|Â|Ã){4,}", text)) or "\ufffd" in text[:200]
+
+
+def _fallback_summary(article: dict[str, Any]) -> list[str]:
+    title = (article.get("title") or "관련 소식").strip()
+    text = (article.get("snippet") or "").strip()
+    if _looks_broken(text) or len(text) < 20:
+        text = title
+    chunks = [
+        re.sub(r"\s+", " ", part).strip(" -")
+        for part in re.split(r"(?<=다)\.\s+|(?<=요)\.\s+|[.!?]\s+", text)
+        if len(part.strip()) > 8 and not _looks_broken(part)
+    ]
+    while len(chunks) < 3:
+        if not chunks:
+            chunks.append(f"{title} 관련 소식이 오늘 오전 주요하게 다뤄졌습니다.")
+        elif len(chunks) == 1:
+            chunks.append("관련 업계와 투자자들의 관심이 이 이슈에 모이고 있습니다.")
+        else:
+            chunks.append("자세한 내용은 아래 원문에서 확인할 수 있습니다.")
+    return [chunk.rstrip(".") for chunk in chunks[:3]]
+
+
+def _gemini_summaries(articles: list[dict[str, Any]]) -> dict[int, list[str]]:
+    key = gemini_api_key()
+    if not key or not articles:
+        return {}
+    try:
+        from google import genai
+    except ImportError:
+        return {}
+    payload = [
+        {"i": i, "title": row.get("title") or "", "snippet": (row.get("snippet") or "")[:500]}
+        for i, row in enumerate(articles)
+    ]
+    prompt = f"""다음 뉴스 목록을 각각 한국어로 핵심만 3문장 요약하세요.
+규칙:
+- 각 뉴스마다 문장 3개. 한 문장은 한 줄.
+- 사실과 맥락만. 투자 권유·단정 금지.
+- JSON만 출력: [{{"i":0,"lines":["문장1","문장2","문장3"]}}, ...]
+
+뉴스:
+{json.dumps(payload, ensure_ascii=False)}
+"""
+    client = genai.Client(api_key=key)
+    raw = ""
+    for model in ("gemini-2.0-flash", "gemini-flash-latest", "gemini-2.5-pro"):
+        try:
+            resp = client.models.generate_content(model=model, contents=prompt)
+            raw = (getattr(resp, "text", None) or "").strip()
+            if raw:
+                break
+        except Exception as exc:  # noqa: BLE001
+            print(f"Gemini 뉴스 요약 생략({model}): {exc}")
+            continue
+    if not raw:
+        return {}
+    raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.I | re.M).strip()
+    try:
+        rows = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    out: dict[int, list[str]] = {}
+    if not isinstance(rows, list):
+        return {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            idx = int(row.get("i"))
+        except (TypeError, ValueError):
+            continue
+        lines = row.get("lines")
+        if not isinstance(lines, list):
+            continue
+        cleaned = [str(line).strip().lstrip("- ").strip() for line in lines if str(line).strip()]
+        if len(cleaned) >= 3:
+            out[idx] = cleaned[:3]
+    return out

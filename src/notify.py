@@ -11,7 +11,7 @@ from email.utils import formataddr
 from pathlib import Path
 
 from .config import REPORTS_DIR, mail_settings
-from .news_digest import build_html, kst_today, kst_today_ko, load_subscribers
+from .news_digest import build_html, build_text, kst_today, load_subscribers, mail_subject
 
 MAIL_SENT_PATH = REPORTS_DIR / "mail_sent.txt"
 MAIL_STATUS_PATH = REPORTS_DIR / "mail_status.txt"
@@ -121,7 +121,6 @@ def send_brief_if_configured(report: dict | None = None, html_path: Path | None 
     del report, html_path, xlsx_path
     cfg = mail_settings()
     asof = kst_today()
-    asof_ko = kst_today_ko()
     if not cfg["host"] or not cfg["user"] or not cfg["password"]:
         return _write_status(
             False,
@@ -147,11 +146,12 @@ def send_brief_if_configured(report: dict | None = None, html_path: Path | None 
 
     payloads: list[tuple[str, bytes]] = []
     for sub in subscribers:
-        msg = MIMEMultipart()
-        msg["Subject"] = f"관심 키워드 핫 뉴스 · {asof_ko}"
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = mail_subject(sub)
         msg["From"] = formataddr((from_name, sender))
         msg["To"] = sub["email"]
-        msg.attach(MIMEText(build_html(sub, asof_ko), "html", "utf-8"))
+        msg.attach(MIMEText(build_text(sub), "plain", "utf-8"))
+        msg.attach(MIMEText(build_html(sub), "html", "utf-8"))
         payloads.append((sub["email"], msg.as_bytes()))
 
     sent_ok: list[str] = []
