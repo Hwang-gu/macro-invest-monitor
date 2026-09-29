@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       mail_only:
-        description: "테스트 수신자 이메일. 앱 뉴스레터 신청자 한 명만 지정하세요."
+        description: "테스트 수신자. 기본값은 gustjd9716@hyundailivart.co.kr 이며, 다른 신청자에게는 보내지 않습니다."
         required: true
         type: string
+        default: "gustjd9716@hyundailivart.co.kr"
 
 jobs:
   send:
