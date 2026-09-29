@@ -22,28 +22,50 @@ CAT_LABELS = {
     "bitcoin": "Bitcoin",
     "others": "Others",
 }
+# lean: conservative | progressive | center
 PRESS_BY_HOST = {
-    "biz.chosun.com": ("조선비즈", "Chosunbiz"),
-    "www.chosun.com": ("조선일보", "Chosun"),
-    "www.hankyung.com": ("한국경제", "Hankyung"),
-    "www.mk.co.kr": ("매일경제", "MK"),
-    "www.edaily.co.kr": ("이데일리", "edaily.co.kr"),
-    "www.yna.co.kr": ("연합뉴스", "Yonhap"),
-    "www.yonhapnewstv.co.kr": ("연합뉴스TV", "YonhapnewsTV"),
-    "v.daum.net": ("다음", "v.daum.net"),
-    "news.daum.net": ("다음", "daum.net"),
-    "www.inews24.com": ("아이뉴스24", "inews24"),
-    "www.newsis.com": ("뉴시스", "Newsis"),
-    "www.nocutnews.co.kr": ("노컷뉴스", "Nocutnews"),
-    "www.sedaily.com": ("서울경제", "Sedaily"),
-    "www.hankookilbo.com": ("한국일보", "Hankookilbo"),
-    "www.joongang.co.kr": ("중앙일보", "JoongAng"),
-    "www.donga.com": ("동아일보", "Donga"),
-    "www.mt.co.kr": ("머니투데이", "MoneyToday"),
-    "www.fnnews.com": ("파이낸셜뉴스", "Fnnews"),
-    "www.thelec.kr": ("디일렉", "thelec.kr"),
-    "www.investing.com": ("인베스팅닷컴", "Investing.com"),
+    "chosun.com": ("조선일보", "conservative"),
+    "biz.chosun.com": ("조선비즈", "conservative"),
+    "chosunbiz.com": ("조선비즈", "conservative"),
+    "joongang.co.kr": ("중앙일보", "conservative"),
+    "donga.com": ("동아일보", "conservative"),
+    "hankyung.com": ("한국경제", "conservative"),
+    "mk.co.kr": ("매일경제", "conservative"),
+    "sedaily.com": ("서울경제", "conservative"),
+    "munhwa.com": ("문화일보", "conservative"),
+    "segye.com": ("세계일보", "conservative"),
+    "kmib.co.kr": ("국민일보", "conservative"),
+    "newdaily.co.kr": ("뉴데일리", "conservative"),
+    "tvchosun.com": ("TV조선", "conservative"),
+    "ichannela.com": ("채널A", "conservative"),
+    "mbn.co.kr": ("MBN", "conservative"),
+    "hani.co.kr": ("한겨레", "progressive"),
+    "khan.co.kr": ("경향신문", "progressive"),
+    "ohmynews.com": ("오마이뉴스", "progressive"),
+    "pressian.com": ("프레시안", "progressive"),
+    "seoul.co.kr": ("서울신문", "progressive"),
+    "jtbc.co.kr": ("JTBC", "progressive"),
+    "mediatoday.co.kr": ("미디어오늘", "progressive"),
+    "sisain.co.kr": ("시사인", "progressive"),
+    "yna.co.kr": ("연합뉴스", "center"),
+    "yonhapnewstv.co.kr": ("연합뉴스TV", "center"),
+    "newsis.com": ("뉴시스", "center"),
+    "news1.kr": ("뉴스1", "center"),
+    "edaily.co.kr": ("이데일리", "center"),
+    "mt.co.kr": ("머니투데이", "center"),
+    "fnnews.com": ("파이낸셜뉴스", "center"),
+    "hankookilbo.com": ("한국일보", "center"),
+    "nocutnews.co.kr": ("노컷뉴스", "center"),
+    "ytn.co.kr": ("YTN", "center"),
+    "kbs.co.kr": ("KBS", "center"),
+    "sbs.co.kr": ("SBS", "center"),
+    "imbc.com": ("MBC", "center"),
+    "inews24.com": ("아이뉴스24", "center"),
+    "thelec.kr": ("디일렉", "center"),
+    "zdnet.co.kr": ("ZDNet", "center"),
+    "bloter.net": ("블로터", "center"),
 }
+SKIP_HOSTS = ("naver.com", "google.com", "bing.com", "daum.net", "nate.com", "msn.com")
 _UA = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -156,9 +178,9 @@ def fetch_hot_news(keyword: str, limit: int = NEWS_PER_KEYWORD) -> list[dict[str
     if cached is not None:
         return cached[:limit]
     articles = _fetch_naver_news(keyword)
-    if len(articles) < limit:
+    if len(articles) < 12:
         articles = _merge_unique(articles, _fetch_bing_news(keyword))
-    articles = _diverse(articles, limit)
+    articles = _select_balanced(articles, limit)
     _fill_summaries(articles)
     _CACHE[keyword] = articles
     return articles
@@ -166,11 +188,11 @@ def fetch_hot_news(keyword: str, limit: int = NEWS_PER_KEYWORD) -> list[dict[str
 
 def build_html(subscriber: dict[str, Any], asof_ko: str | None = None) -> str:
     del asof_ko
-    spacer = "<p style='margin:0;padding:0;line-height:12px;font-size:12px;'>&nbsp;</p>"
+    spacer = "<p style='margin:0;padding:0;line-height:10px;font-size:9pt;'>&nbsp;</p>"
     parts = [
         "<div style=\"font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;"
-        "font-size:14pt;line-height:1.65;color:#222;max-width:720px\">",
-        "<p style='margin:0 0 6px 0;'>Good morning Sir. This is Marchisio.</p>",
+        "font-size:9pt;line-height:1.55;color:#222;max-width:720px\">",
+        "<p style='margin:0 0 4px 0;font-size:9pt;'>Good morning Sir. This is Marchisio.</p>",
         spacer,
         spacer,
     ]
@@ -181,29 +203,28 @@ def build_html(subscriber: dict[str, Any], asof_ko: str | None = None) -> str:
             parts.append(spacer)
         first_kw = False
         parts.append(
-            "<p style='margin:18px 0 10px 0;font-size:15pt;font-weight:bold;'>"
+            "<p style='margin:16px 0 8px 0;font-size:9pt;font-weight:bold;'>"
             f"&lt; {html.escape(word)} &gt;</p>"
         )
         parts.append(spacer)
         news = fetch_hot_news(word)
         if not news:
-            parts.append("<p style='margin:8px 0 16px 0;'>오늘 관련 뉴스를 찾지 못했습니다.</p>")
+            parts.append("<p style='margin:8px 0 16px 0;font-size:9pt;'>오늘 관련 뉴스를 찾지 못했습니다.</p>")
             continue
         for item in news:
             headline = html.escape(_headline(item))
             url = html.escape(item["url"], quote=True)
             parts.append(
-                "<p style='margin:18px 0 8px 0;font-size:16pt;font-weight:bold;line-height:1.45;'>"
-                f"📌 <a href='{url}' style='font-size:16pt;font-weight:bold;color:#1155cc;"
-                f"text-decoration:underline;'>{headline}</a></p>"
+                "<p style='margin:16px 0 6px 0;font-size:14pt;font-weight:bold;line-height:1.4;'>"
+                f"📌 <span style='font-size:14pt;font-weight:bold;'>{headline}</span></p>"
             )
             for line in item.get("summary") or _fallback_summary(item):
                 parts.append(
-                    f"<p style='margin:3px 0;font-size:14pt;'>- {html.escape(line)}</p>"
+                    f"<p style='margin:2px 0;font-size:9pt;'>- {html.escape(line)}</p>"
                 )
             parts.append(
-                "<p style='margin:6px 0 16px 0;font-size:14pt;'>"
-                f"URL: <a href='{url}'>{html.escape(item['url'])}</a></p>"
+                "<p style='margin:6px 0 14px 0;font-size:9pt;'>"
+                f"URL: <a href='{url}' style='font-size:9pt;'>{html.escape(item['url'])}</a></p>"
             )
     parts.append("</div>")
     return "".join(parts)
@@ -233,7 +254,7 @@ def build_text(subscriber: dict[str, Any]) -> str:
 
 
 def _headline(item: dict[str, Any]) -> str:
-    title = (item.get("title") or "").strip()
+    title = _strip_trailing_source((item.get("title") or "").strip())
     source = (item.get("source") or "").strip()
     if source and source not in title:
         return f"{title} - {source}"
@@ -245,6 +266,10 @@ def _fetch_naver_news(keyword: str) -> list[dict[str, Any]]:
     urls = [
         f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_opt&sort=0&nso=so:r,p:1d",
         f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_opt&sort=0",
+        f"https://search.naver.com/search.naver?where=news&query={quote(keyword + ' 한겨레')}&sm=tab_opt&sort=0&nso=so:r,p:1d",
+        f"https://search.naver.com/search.naver?where=news&query={quote(keyword + ' 조선일보')}&sm=tab_opt&sort=0&nso=so:r,p:1d",
+        f"https://search.naver.com/search.naver?where=news&query={quote(keyword + ' 경향신문')}&sm=tab_opt&sort=0&nso=so:r,p:1d",
+        f"https://search.naver.com/search.naver?where=news&query={quote(keyword + ' 중앙일보')}&sm=tab_opt&sort=0&nso=so:r,p:1d",
     ]
     articles: list[dict[str, Any]] = []
     for url in urls:
@@ -255,10 +280,8 @@ def _fetch_naver_news(keyword: str) -> list[dict[str, Any]]:
             continue
         parsed = _parse_naver_results(resp.text)
         articles = _merge_unique(articles, parsed)
-        if len(articles) >= NEWS_PER_KEYWORD:
-            break
-        time.sleep(0.2)
-    return articles[:NEWS_PER_KEYWORD]
+        time.sleep(0.15)
+    return articles[:30]
 
 
 def _parse_naver_results(page: str) -> list[dict[str, Any]]:
@@ -274,8 +297,9 @@ def _parse_naver_results(page: str) -> list[dict[str, Any]]:
         if not href.startswith("http") or len(title) < 8:
             continue
         host = (urlparse(href).hostname or "").lower()
-        if "naver.com" in host or "google.com" in host or "bing.com" in host:
+        if any(skip in host for skip in SKIP_HOSTS):
             continue
+        name, lean = _press_info(host)
         if href in index:
             row = items[index[href]]
             cleaned = _clean_headline(title)
@@ -291,7 +315,9 @@ def _parse_naver_results(page: str) -> list[dict[str, Any]]:
             {
                 "title": _clean_headline(title),
                 "url": href,
-                "source": _source_from_host(host),
+                "source": name,
+                "lean": lean,
+                "press_key": name,
                 "snippet": title if len(title) > 80 else "",
                 "summary": [],
             }
@@ -319,14 +345,17 @@ def _fetch_bing_news(keyword: str) -> list[dict[str, Any]]:
         if not title or not link.startswith("http"):
             continue
         host = (urlparse(link).hostname or "").lower()
-        if "bing.com" in host or "msn.com" in host:
+        if any(skip in host for skip in SKIP_HOSTS):
             continue
+        name, lean = _press_info(host)
         desc = html.unescape(re.sub(r"<[^>]+>", " ", item.findtext("description") or ""))
         articles.append(
             {
-                "title": title,
+                "title": _clean_headline(title),
                 "url": link,
-                "source": _source_from_host(host),
+                "source": name,
+                "lean": lean,
+                "press_key": name,
                 "snippet": " ".join(desc.split()),
                 "summary": [],
             }
@@ -343,6 +372,7 @@ def _unwrap_bing_url(link: str) -> str:
 def _clean_headline(title: str) -> str:
     title = title.replace("새 창 열림", " ").replace("Keep 저장", " ").replace("Keep", " ")
     title = re.split(r"새 창", title)[0]
+    title = _strip_trailing_source(title)
     title = re.sub(r"\s+", " ", title).strip(" -|")
     if len(title) > 90:
         cut = title[:90]
@@ -350,6 +380,59 @@ def _clean_headline(title: str) -> str:
             cut = cut.rsplit(" ", 1)[0]
         title = cut.rstrip(".,…") + "…"
     return title
+
+
+def _strip_trailing_source(title: str) -> str:
+    title = re.sub(r"\s+[-–—]\s+[^-–—]{1,40}$", "", title).strip()
+    title = re.sub(r"\s+\([^)]{1,20}\)$", "", title).strip()
+    return title
+
+
+def _select_balanced(articles: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    pool = _diverse(articles, max(limit * 6, 12))
+    picked: list[dict[str, Any]] = []
+    used_press: set[str] = set()
+    used_leans: set[str] = set()
+
+    def try_add(row: dict[str, Any], require_new_lean: bool = False) -> bool:
+        if row in picked:
+            return False
+        press = row.get("press_key") or row.get("source") or ""
+        lean = row.get("lean") or "center"
+        if press and press in used_press:
+            return False
+        if require_new_lean and lean in used_leans and "center" not in {lean}:
+            return False
+        if any(_too_similar(row["title"], prev["title"]) for prev in picked):
+            return False
+        picked.append(row)
+        if press:
+            used_press.add(press)
+        used_leans.add(lean)
+        return True
+
+    for lean in ("conservative", "progressive", "center"):
+        if len(picked) >= limit:
+            break
+        for row in pool:
+            if (row.get("lean") or "center") != lean:
+                continue
+            if try_add(row):
+                break
+
+    for row in pool:
+        if len(picked) >= limit:
+            break
+        try_add(row)
+
+    if len(picked) < limit:
+        for row in articles:
+            if len(picked) >= limit:
+                break
+            if row in picked:
+                continue
+            picked.append(row)
+    return picked[:limit]
 
 
 def _diverse(articles: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
@@ -368,9 +451,6 @@ def _diverse(articles: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]
             if len(picked) >= limit:
                 break
     return picked
-
-
-def _too_similar(left: str, right: str) -> bool:
     a = _stems(left)
     b = _stems(right)
     if len(a) < 3 or len(b) < 3:
@@ -395,9 +475,6 @@ def _stems(text: str) -> set[str]:
         if len(stem) >= 2:
             out.add(stem)
     return out
-    parsed = urlparse(link)
-    qs = dict(parse_qsl(parsed.query))
-    return qs.get("url") or link
 
 
 def _merge_unique(
@@ -419,12 +496,18 @@ def _norm_title(title: str) -> str:
     return re.sub(r"\s+", " ", title).casefold()
 
 
-def _source_from_host(host: str) -> str:
+def _press_info(host: str) -> tuple[str, str]:
+    host = (host or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
     if host in PRESS_BY_HOST:
-        ko, en = PRESS_BY_HOST[host]
-        return f"{ko} · {en}"
-    host = host[4:] if host.startswith("www.") else host
-    return host
+        return PRESS_BY_HOST[host]
+    for key, val in PRESS_BY_HOST.items():
+        if host.endswith("." + key) or host == key:
+            return val
+    parts = [p for p in host.split(".") if p not in {"www", "news", "biz", "m"}]
+    label = parts[0] if parts else "언론"
+    return (label, "center")
 
 
 def _clean_url(url: str) -> str:
