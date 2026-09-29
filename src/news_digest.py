@@ -72,10 +72,8 @@ def kst_md() -> str:
 def mail_subject(subscriber: dict[str, Any]) -> str:
     labels = [CAT_LABELS[c] for c in subscriber.get("categories") or [] if c in CAT_LABELS]
     stamp = kst_md()
-    if len(labels) == 1:
-        return f"[Marchisio News] {stamp} {labels[0]}"
     if labels:
-        return f"[Marchisio News] {stamp} ({', '.join(labels)})"
+        return f"[Marchisio News] {stamp} {', '.join(labels)}"
     return f"[Marchisio News] {stamp}"
 
 
