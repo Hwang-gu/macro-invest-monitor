@@ -7,6 +7,11 @@ on:
     - cron: "0 21 * * *"
     - cron: "30 22 * * *"
   workflow_dispatch:
+    inputs:
+      send_mail:
+        description: "뉴스레터 발송. 테스트도 반드시 허락받은 뒤에만 켜세요."
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -20,6 +25,8 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      TED_SEND_MAIL: ${{ github.event_name == 'schedule' && '1' || inputs.send_mail && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,7 +50,7 @@ jobs:
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
         run: python -m src --mode daily
-      - name: Send briefing email
+      - name: Send keyword news email
         if: always() && steps.rebuild.outcome == 'success'
         continue-on-error: true
         env:

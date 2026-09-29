@@ -186,6 +186,7 @@ def mail_settings() -> dict[str, str]:
     user = os.getenv("SMTP_USER", "").strip()
     password = os.getenv("SMTP_PASSWORD", "").strip()
     mail_from = os.getenv("MAIL_FROM", "").strip()
+    mail_from_name = os.getenv("MAIL_FROM_NAME", "").strip() or "Claudio Marchisio"
     mail_to = os.getenv("MAIL_TO", "").strip()
     manager_id = os.getenv("TED_MANAGER_ID", "").strip()
     manager_pw = os.getenv("TED_MANAGER_PW", "").strip()
@@ -206,5 +207,6 @@ def mail_settings() -> dict[str, str]:
         "user": user,
         "password": password,
         "mail_from": mail_from,
+        "mail_from_name": mail_from_name,
         "mail_to": mail_to,
     }
