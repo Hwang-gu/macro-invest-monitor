@@ -119,7 +119,7 @@
       "n_folds": 5.0,
       "n_oos": 5690.0,
       "test_mean_pred": -0.018151969300644385,
-      "test_mean_actual": 0.004613442266202466
+      "test_mean_actual": 0.004613442266202465
     },
     "us_robotics": {
       "n": 2608.0,
