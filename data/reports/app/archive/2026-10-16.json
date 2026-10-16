@@ -13,11 +13,11 @@
       },
       {
         "label": "미국 10년 금리",
-        "value": "5.19%"
+        "value": "5.10%"
       },
       {
         "label": "원/달러",
-        "value": "1343.2"
+        "value": "1340.9"
       }
     ],
     "paragraphs": [
@@ -30,10 +30,10 @@
     ]
   },
   "weights": {
-    "gold": 0.1307,
-    "bitcoin": 0.4664,
-    "kospi": 0.0486,
-    "kosdaq": 0.1109,
-    "nasdaq": 0.2434
+    "gold": 0.1456,
+    "bitcoin": 0.4687,
+    "kospi": 0.0527,
+    "kosdaq": 0.1203,
+    "nasdaq": 0.2126
   }
 }
