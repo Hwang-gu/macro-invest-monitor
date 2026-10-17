@@ -1,6 +1,6 @@
 {
   "asof": "2026-10-16",
-  "generated": "2026-10-16",
+  "generated": "2026-10-17",
   "horizon_days": 21,
   "horizon_label": "1개월",
   "asset": "bitcoin",
@@ -118,7 +118,7 @@
       "n_folds": 5.0,
       "n_oos": 5695.0,
       "test_mean_pred": -0.017005021493316952,
-      "test_mean_actual": 0.004588105446625582
+      "test_mean_actual": 0.004588105446625581
     },
     "us_robotics": {
       "n": 2613.0,
