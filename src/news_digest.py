@@ -267,7 +267,8 @@ def collect_morning_digest(force: bool | None = None) -> Path:
         "keywords": {},
     }
     for word in keywords:
-        digest["keywords"][word] = _collect_keyword_news(word, NEWS_PER_KEYWORD)
+        rows = _collect_keyword_news(word, NEWS_PER_KEYWORD)
+        digest["keywords"][word] = [{k: v for k, v in row.items() if k != "body"} for row in rows]
         print(f"  {word}: {len(digest['keywords'][word])}건")
     DIGEST_PATH.parent.mkdir(parents=True, exist_ok=True)
     DIGEST_PATH.write_text(json.dumps(digest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -428,11 +429,19 @@ def _collect_keyword_news(keyword: str, limit: int) -> list[dict[str, Any]]:
     articles = _fetch_naver_news(keyword)
     articles = _merge_unique(articles, _keyword_hits(_ranking_pool(), keyword, unwrap=True))
     articles = _merge_unique(articles, _keyword_hits(_homepage_pool(), keyword, unwrap=False))
+    ranking_thin = _naver_signals_thin()
+    google = _fetch_google_news(keyword)
+    if google:
+        print(f"  google {keyword}: {len(google)}건 (네이버 조회수·랭킹 부족={ranking_thin})")
+        articles = _merge_unique(articles, google)
+    elif ranking_thin or len(articles) < 12:
+        articles = _merge_unique(articles, _fetch_bing_news(keyword))
     if len(articles) < 12:
         articles = _merge_unique(articles, _fetch_bing_news(keyword))
     for i, row in enumerate(articles):
         row["score"] = _news_score(row, i)
     articles.sort(key=lambda row: int(row.get("score") or 0), reverse=True)
+    articles = _dedupe_stories(articles)
     picked = _select_balanced(articles, limit)
     _fill_summaries(picked)
     return picked
@@ -509,7 +518,17 @@ def _news_score(row: dict[str, Any], search_index: int) -> int:
     if home:
         score += 110 + max(0, (12 - int(home.get("home_pos") or 12)) * 6)
     score += max(0, 35 - int(row.get("search_rank") or search_index))
+    if row.get("from_google"):
+        bonus = 90 if _naver_signals_thin() else 55
+        score += bonus + max(0, (12 - int(row.get("google_rank") or 12)) * 6)
     return score
+
+
+def _naver_signals_thin() -> bool:
+    pool = _ranking_pool()
+    if len(pool) < 6:
+        return True
+    return not any(int(row.get("views") or 0) > 0 for row in pool)
 
 
 def _best_pool_match(row: dict[str, Any], pool: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -737,6 +756,150 @@ def _parse_naver_results(page: str) -> list[dict[str, Any]]:
     return items
 
 
+def _fetch_google_news(keyword: str) -> list[dict[str, Any]]:
+    articles = _fetch_google_news_html(keyword)
+    if len(articles) < 8:
+        articles = _merge_unique(articles, _fetch_google_news_rss(keyword))
+    return articles[:25]
+
+
+def _fetch_google_news_html(keyword: str) -> list[dict[str, Any]]:
+    items = _parse_google_news_html(keyword, recent=True)
+    if len(items) < 6:
+        items = _merge_unique(items, _parse_google_news_html(keyword, recent=False))
+    return items
+
+
+def _parse_google_news_html(keyword: str, recent: bool) -> list[dict[str, Any]]:
+    query = quote(f"{keyword} when:1d" if recent else keyword)
+    url = f"https://www.google.com/search?tbm=nws&hl=ko&gl=kr&num=20&q={query}"
+    try:
+        resp = requests.get(url, timeout=20, headers={**_UA, "Referer": "https://www.google.com/"})
+        resp.raise_for_status()
+    except requests.RequestException:
+        return []
+    try:
+        doc = lhtml.fromstring(resp.text)
+    except Exception:  # noqa: BLE001
+        return []
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for anchor in doc.xpath("//a[@href]"):
+        href = _unwrap_google_href(anchor.get("href") or "")
+        title = _clean_headline(" ".join((anchor.text_content() or "").split()))
+        if not href.startswith("http") or len(title) < 8:
+            continue
+        host = (urlparse(href).hostname or "").lower()
+        if any(skip in host for skip in SKIP_HOSTS):
+            continue
+        key = _norm_title(title)
+        if key in seen:
+            continue
+        seen.add(key)
+        name, lean = _press_info(host)
+        items.append(
+            {
+                "title": title,
+                "url": href,
+                "source": name,
+                "lean": lean,
+                "press_key": name,
+                "snippet": "",
+                "summary": [],
+                "from_google": True,
+                "google_rank": len(items) + 1,
+            }
+        )
+        if len(items) >= 20:
+            break
+    return items
+
+
+def _fetch_google_news_rss(keyword: str) -> list[dict[str, Any]]:
+    articles = _parse_google_news_rss(f"{keyword} when:1d")
+    if len(articles) < 6:
+        articles = _merge_unique(articles, _parse_google_news_rss(keyword))
+    return articles
+
+
+def _parse_google_news_rss(query_text: str) -> list[dict[str, Any]]:
+    query = quote(query_text)
+    url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
+    try:
+        resp = requests.get(url, timeout=20, headers=_UA)
+        resp.raise_for_status()
+    except requests.RequestException:
+        return []
+    import xml.etree.ElementTree as ET
+
+    try:
+        root = ET.fromstring(resp.content)
+    except ET.ParseError:
+        return []
+    articles: list[dict[str, Any]] = []
+    for rank, item in enumerate(root.findall(".//item"), start=1):
+        title = html.unescape((item.findtext("title") or "").strip())
+        title = _clean_headline(_strip_trailing_source(title))
+        link = _unwrap_google_href(item.findtext("link") or "")
+        if "google.com" in (urlparse(link).hostname or "").lower():
+            desc = item.findtext("description") or ""
+            found = re.search(r'href=["\'](https?://[^"\']+)["\']', html.unescape(desc))
+            if found:
+                link = _unwrap_google_href(found.group(1))
+        if "google.com" in (urlparse(link).hostname or "").lower():
+            link = _follow_url(link)
+        if not title or not link.startswith("http"):
+            continue
+        host = (urlparse(link).hostname or "").lower()
+        if any(skip in host for skip in SKIP_HOSTS):
+            continue
+        source_el = item.find("source")
+        source_name = (source_el.text or "").strip() if source_el is not None else ""
+        name, lean = _press_info(host)
+        if source_name:
+            name = source_name
+            lean = _lean_for_press(name) or lean
+        desc = html.unescape(re.sub(r"<[^>]+>", " ", item.findtext("description") or ""))
+        articles.append(
+            {
+                "title": title,
+                "url": link,
+                "source": name,
+                "lean": lean,
+                "press_key": name,
+                "snippet": " ".join(desc.split()),
+                "summary": [],
+                "from_google": True,
+                "google_rank": rank,
+            }
+        )
+    return articles
+
+
+def _unwrap_google_href(href: str) -> str:
+    href = (href or "").strip()
+    if href.startswith("/url?"):
+        qs = dict(parse_qsl(urlparse(href).query))
+        href = qs.get("q") or qs.get("url") or href
+    parsed = urlparse(href)
+    if parsed.path == "/url":
+        qs = dict(parse_qsl(parsed.query))
+        href = qs.get("q") or qs.get("url") or href
+    return _clean_url(href)
+
+
+def _follow_url(url: str) -> str:
+    try:
+        resp = requests.get(url, timeout=10, headers=_UA, allow_redirects=True)
+        final = _clean_url(str(resp.url or url))
+        host = (urlparse(final).hostname or "").lower()
+        if "google.com" not in host:
+            return final
+    except requests.RequestException:
+        return url
+    return url
+
+
 def _fetch_bing_news(keyword: str) -> list[dict[str, Any]]:
     url = f"https://www.bing.com/news/search?q={quote(keyword)}&format=rss"
     try:
@@ -810,7 +973,7 @@ def _select_balanced(articles: list[dict[str, Any]], limit: int) -> list[dict[st
         press = row.get("press_key") or row.get("source") or ""
         if press and press in used_press:
             return False
-        if any(_too_similar(row["title"], prev["title"]) for prev in picked):
+        if any(_same_story(row, prev) for prev in picked):
             return False
         picked.append(row)
         if press:
@@ -830,14 +993,40 @@ def _select_balanced(articles: list[dict[str, Any]], limit: int) -> list[dict[st
         if len(picked) >= limit:
             break
         try_add(row)
-
-    if len(picked) < limit:
-        for row in articles:
-            if len(picked) >= limit:
-                break
-            if row not in picked:
-                picked.append(row)
     return picked[:limit]
+
+
+def _dedupe_stories(articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    kept: list[dict[str, Any]] = []
+    for row in articles:
+        if any(_same_story(row, prev) for prev in kept):
+            continue
+        kept.append(row)
+    return kept
+
+
+def _same_story(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    left_url = _canonical_url(str(left.get("url") or ""))
+    right_url = _canonical_url(str(right.get("url") or ""))
+    if left_url and right_url and left_url == right_url:
+        return True
+    if _too_similar(str(left.get("title") or ""), str(right.get("title") or "")):
+        return True
+    left_snip = str(left.get("snippet") or "")[:120]
+    right_snip = str(right.get("snippet") or "")[:120]
+    if len(left_snip) >= 40 and len(right_snip) >= 40 and _too_similar(left_snip, right_snip):
+        return True
+    return False
+
+
+def _canonical_url(url: str) -> str:
+    parsed = urlparse(_clean_url(url))
+    host = (parsed.hostname or "").lower()
+    for prefix in ("www.", "m.", "news."):
+        if host.startswith(prefix) and host.count(".") >= 2:
+            host = host[len(prefix) :]
+    path = re.sub(r"/+$", "", parsed.path or "").lower()
+    return f"{host}{path}"
 
 
 def _diverse(articles: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
@@ -859,28 +1048,74 @@ def _diverse(articles: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]
 
 
 def _too_similar(left: str, right: str) -> bool:
+    ln = _norm_title(left)
+    rn = _norm_title(right)
+    if not ln or not rn:
+        return False
+    if ln == rn:
+        return True
+    if min(len(ln), len(rn)) >= 12 and (ln in rn or rn in ln):
+        return True
     a = _stems(left)
     b = _stems(right)
-    if len(a) < 3 or len(b) < 3:
+    if not a or not b:
         return False
-    overlap = set(a) & set(b)
-    extra = 0
+    matched: set[str] = set()
+    overlap = 0
     for x in a:
         for y in b:
-            if x == y:
+            if y in matched:
                 continue
-            if min(len(x), len(y)) >= 3 and (x in y or y in x):
-                extra += 1
+            if _stems_close(x, y):
+                overlap += 1
+                matched.add(y)
                 break
-    return len(overlap) + min(extra, 3) >= 4
+    union = len(a) + len(b) - overlap
+    if overlap >= 4:
+        return True
+    if overlap >= 3 and overlap / max(union, 1) >= 0.4:
+        return True
+    if min(len(a), len(b)) <= 5 and overlap >= 2 and overlap / max(union, 1) >= 0.45:
+        return True
+    return False
+
+
+def _stems_close(left: str, right: str) -> bool:
+    if left == right:
+        return True
+    if min(len(left), len(right)) >= 3 and (left in right or right in left):
+        return True
+    if min(len(left), len(right)) >= 3 and left[:2] == right[:2] and abs(len(left) - len(right)) <= 2:
+        return True
+    strip = r"(원|억원|조원|만원|억|조)$"
+    return bool(re.sub(strip, "", left) and re.sub(strip, "", left) == re.sub(strip, "", right))
 
 
 def _stems(text: str) -> set[str]:
     text = text.replace("美", "").replace("社", "개사")
+    skip = {
+        "관련",
+        "오늘",
+        "기자",
+        "뉴스",
+        "종합",
+        "속보",
+        "단독",
+        "영상",
+        "사진",
+        "특징주",
+        "코스피",
+        "코스닥",
+        "오후",
+        "오전",
+        "이번",
+        "국내",
+        "해외",
+    }
     out: set[str] = set()
     for tok in re.findall(r"[가-힣A-Za-z0-9]{2,}", text):
         stem = re.sub(r"(에서|으로|에게|까지|부터|하는|된|할|에|로|을|를|이|가|은|는|의)$", "", tok)
-        if len(stem) >= 2:
+        if len(stem) >= 2 and stem not in skip:
             out.add(stem)
     return out
 
@@ -932,35 +1167,73 @@ def _clean_url(url: str) -> str:
 
 def _fill_summaries(articles: list[dict[str, Any]]) -> None:
     for article in articles:
-        snippet = (article.get("snippet") or "").strip()
-        if len(snippet) < 40:
-            fetched = _page_snippet(article["url"])
-            if fetched:
-                article["snippet"] = fetched
+        fetched = _page_text(article["url"])
+        if fetched:
+            article["body"] = fetched
+            if len((article.get("snippet") or "").strip()) < 80:
+                article["snippet"] = fetched[:700]
     generated = _gemini_summaries(articles)
     for i, article in enumerate(articles):
-        lines = generated.get(i) or _fallback_summary(article)
+        lines = generated.get(i)
+        if not _usable_summary(lines, article):
+            lines = _fallback_summary(article)
         article["summary"] = lines[:3]
 
 
-def _page_snippet(url: str) -> str:
+def _page_text(url: str) -> str:
     try:
-        resp = requests.get(url, timeout=8, headers={**_UA, "Referer": "https://search.naver.com/"})
+        resp = requests.get(url, timeout=12, headers={**_UA, "Referer": "https://search.naver.com/"})
         resp.raise_for_status()
-        text = resp.content.decode("utf-8", errors="replace")[:200000]
+        raw = resp.content.decode("utf-8", errors="replace")[:250000]
     except requests.RequestException:
         return ""
-    if _looks_broken(text[:500]):
+    if _looks_broken(raw[:500]):
         return ""
+    chunks: list[str] = []
     for pat in (
         r'property=["\']og:description["\'][^>]*content=["\']([^"\']+)',
         r'content=["\']([^"\']+)["\'][^>]*property=["\']og:description["\']',
         r'name=["\']description["\'][^>]*content=["\']([^"\']+)',
     ):
-        match = re.search(pat, text, re.I)
+        match = re.search(pat, raw, re.I)
         if match:
-            return html.unescape(re.sub(r"\s+", " ", match.group(1))).strip()
-    return ""
+            desc = html.unescape(re.sub(r"\s+", " ", match.group(1))).strip()
+            if desc and not _looks_broken(desc):
+                chunks.append(desc)
+            break
+    try:
+        doc = lhtml.fromstring(raw)
+    except Exception:  # noqa: BLE001
+        return " ".join(chunks)[:2500]
+    for xp in (
+        "//article//p",
+        "//*[@itemprop='articleBody']//p",
+        "//*[contains(@class,'article-body')]//p",
+        "//*[contains(@class,'article_body')]//p",
+        "//*[contains(@class,'news_end')]//p",
+        "//*[contains(@id,'article')]//p",
+        "//p",
+    ):
+        found = False
+        for node in doc.xpath(xp):
+            text = " ".join((node.text_content() or "").split())
+            if len(text) < 30 or _looks_broken(text):
+                continue
+            if re.search(r"(구독|로그인|댓글|광고|copyright|기자\s*페이지)", text, re.I):
+                continue
+            if text in chunks:
+                continue
+            chunks.append(text)
+            found = True
+            if sum(len(part) for part in chunks) >= 1800:
+                break
+        if found and sum(len(part) for part in chunks) >= 240:
+            break
+    return " ".join(chunks)[:2500]
+
+
+def _page_snippet(url: str) -> str:
+    return _page_text(url)[:700]
 
 
 def _looks_broken(text: str) -> bool:
@@ -969,24 +1242,58 @@ def _looks_broken(text: str) -> bool:
     return bool(re.search(r"(?:ì|í|ë|å|Â|Ã){4,}", text)) or "\ufffd" in text[:200]
 
 
+_EMPTY_SUMMARY = re.compile(
+    r"(관심이 모이|자세한 내용은|원문에서 확인|주요하게 다뤄|아래 URL|투자자들의 관심|"
+    r"주목받고 있|이슈에 모이|확인하시기 바랍니다)"
+)
+
+
+def _usable_summary(lines: list[str] | None, article: dict[str, Any]) -> bool:
+    if not lines or len(lines) < 3:
+        return False
+    cleaned = [str(line).strip() for line in lines if str(line).strip()]
+    if len(cleaned) < 3:
+        return False
+    if any(_EMPTY_SUMMARY.search(line) for line in cleaned):
+        return False
+    title = str(article.get("title") or "")
+    if sum(1 for line in cleaned if _too_similar(line, title)) >= 2:
+        return False
+    return True
+
+
 def _fallback_summary(article: dict[str, Any]) -> list[str]:
     title = (article.get("title") or "관련 소식").strip()
-    text = (article.get("snippet") or "").strip()
-    if _looks_broken(text) or len(text) < 20:
-        text = title
+    text = (article.get("body") or article.get("snippet") or "").strip()
+    if _looks_broken(text) or len(text) < 40:
+        text = " ".join(part for part in (article.get("snippet"), title) if part).strip()
     chunks = [
         re.sub(r"\s+", " ", part).strip(" -")
         for part in re.split(r"(?<=다)\.\s+|(?<=요)\.\s+|[.!?]\s+", text)
-        if len(part.strip()) > 8 and not _looks_broken(part)
+        if len(part.strip()) > 18 and not _looks_broken(part) and not _EMPTY_SUMMARY.search(part)
     ]
-    while len(chunks) < 3:
-        if not chunks:
-            chunks.append(f"{title} 관련 소식이 오늘 오전 주요하게 다뤄졌습니다.")
-        elif len(chunks) == 1:
-            chunks.append("관련 업계와 투자자들의 관심이 이 이슈에 모이고 있습니다.")
-        else:
-            chunks.append("자세한 내용은 아래 원문에서 확인할 수 있습니다.")
-    return [chunk.rstrip(".") for chunk in chunks[:3]]
+    useful: list[str] = []
+    for part in chunks:
+        if _too_similar(part, title) and useful:
+            continue
+        if any(_too_similar(part, prev) for prev in useful):
+            continue
+        useful.append(part.rstrip("."))
+        if len(useful) >= 3:
+            break
+    if len(useful) < 3:
+        extras = [p.strip(" ,") for p in re.split(r"[,;·]| 그리고 | 또한 ", text) if len(p.strip()) > 18]
+        for part in extras:
+            if _EMPTY_SUMMARY.search(part) or _too_similar(part, title):
+                continue
+            if any(_too_similar(part, prev) for prev in useful):
+                continue
+            useful.append(re.sub(r"\s+", " ", part).rstrip("."))
+            if len(useful) >= 3:
+                break
+    if not useful:
+        useful.append(title.rstrip("."))
+    return useful[:3]
 
 
 def _gemini_summaries(articles: list[dict[str, Any]]) -> dict[int, list[str]]:
@@ -998,13 +1305,23 @@ def _gemini_summaries(articles: list[dict[str, Any]]) -> dict[int, list[str]]:
     except ImportError:
         return {}
     payload = [
-        {"i": i, "title": row.get("title") or "", "snippet": (row.get("snippet") or "")[:500]}
+        {
+            "i": i,
+            "title": row.get("title") or "",
+            "source": row.get("source") or "",
+            "body": ((row.get("body") or row.get("snippet") or "")[:1400]),
+        }
         for i, row in enumerate(articles)
     ]
-    prompt = f"""다음 뉴스 목록을 각각 한국어로 핵심만 3문장 요약하세요.
+    prompt = f"""헤드라인만 본 독자가 원문을 열지 않고도 기사 내용을 대략 이해하도록, 각 뉴스를 한국어 3문장으로 요약하세요.
+
 규칙:
-- 각 뉴스마다 문장 3개. 한 문장은 한 줄.
-- 사실과 맥락만. 투자 권유·단정 금지.
+- 1문장: 누가/무엇이 무엇을 했는지, 결과를 구체적으로.
+- 2문장: 수치, 당사자, 배경 등 본문에 나온 핵심 사실.
+- 3문장: 쟁점이나 앞으로의 영향. 본문에 없으면 부가 사실을 나눠 쓰되 지어내지 말 것.
+- 헤드라인을 그대로 반복하지 말 것.
+- "~관심이 모이고 있습니다", "자세한 내용은 원문", "주요하게 다뤄졌습니다" 같은 빈 문장 금지.
+- 투자 권유·추측 금지.
 - JSON만 출력: [{{"i":0,"lines":["문장1","문장2","문장3"]}}, ...]
 
 뉴스:
@@ -1042,8 +1359,11 @@ def _gemini_summaries(articles: list[dict[str, Any]]) -> dict[int, list[str]]:
         if not isinstance(lines, list):
             continue
         cleaned = [str(line).strip().lstrip("- ").strip() for line in lines if str(line).strip()]
-        if len(cleaned) >= 3:
-            out[idx] = cleaned[:3]
+        if idx < 0 or idx >= len(articles):
+            continue
+        candidate = cleaned[:3]
+        if _usable_summary(candidate, articles[idx]):
+            out[idx] = candidate
     return out
 
 
