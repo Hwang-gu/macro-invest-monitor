@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from pathlib import Path
 
+from .calendar_kr import mail_day_status
 from .config import REPORTS_DIR, mail_settings
 from .news_digest import build_html, build_text, kst_today, load_subscribers, mail_subject
 
@@ -130,6 +131,10 @@ def send_brief_if_configured(report: dict | None = None, html_path: Path | None 
     if not _send_mail_enabled():
         return _write_status(True, "뉴스레터 발송을 건너뛰었습니다. 예약 발송이 아니거나 발송 허락이 없습니다.")
     test_send = _is_test_send()
+    if not test_send:
+        ok_day, skip_reason = mail_day_status()
+        if not ok_day:
+            return _write_status(True, skip_reason)
     if not test_send and _already_sent(asof):
         return _write_status(True, f"이미 {asof} 뉴스레터를 보냈습니다.")
 
