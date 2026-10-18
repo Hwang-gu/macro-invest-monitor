@@ -2,9 +2,8 @@ name: daily-update
 
 on:
   schedule:
-    # UTC 일~목 22:00 = 한국시간 월~금 07:00. 주말에는 돌지 않습니다.
-    # GitHub cron 지연 대비로 20분 뒤 한 번 더 돌리고, 같은 날은 메일을 한 번만 보냅니다.
-    # 공휴일은 cron이 켜져도 발송 단계에서 건너뜁니다.
+    # 앱·시세 데이터. 뉴스레터 발송은 morning-mail 워크플로가 담당합니다.
+    # UTC 일~목 22:00/22:20 = 한국시간 월~금 07:00/07:20. 주말에는 돌지 않습니다.
     - cron: "0 22 * * 0-4"
     - cron: "20 22 * * 0-4"
   workflow_dispatch:
@@ -27,7 +26,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     env:
-      TED_SEND_MAIL: ${{ github.event_name == 'schedule' && '1' || inputs.send_mail && '1' || '0' }}
+      TED_SEND_MAIL: ${{ github.event_name != 'schedule' && inputs.send_mail && '1' || '0' }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +52,7 @@ jobs:
           MAIL_TO: ${{ secrets.MAIL_TO }}
         run: python -m src --mode daily
       - name: Send keyword news email
-        if: always() && steps.rebuild.outcome == 'success'
+        if: always() && steps.rebuild.outcome == 'success' && env.TED_SEND_MAIL == '1'
         continue-on-error: true
         env:
           TED_MANAGER_ID: ${{ secrets.TED_MANAGER_ID }}
@@ -71,7 +70,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/raw data/events.json data/ted_users.json data/ted_ads.json data/ted_newsletters.json data/ted_notices.json data/ads data/ted_sync_box.json data/reports/latest.json data/reports/app
           if [ -f data/reports/mail_sent.txt ]; then git add -f data/reports/mail_sent.txt; fi
-          git diff --cached --quiet || git commit -m "daily data $(date -u +%Y-%m-%d)"
+          if [ -f data/reports/news_digest.json ]; then git add -f data/reports/news_digest.json; fi
+          git diff --cached --quiet && exit 0
+          git commit -m "daily data $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push && exit 0
+            sleep 8
+          done
           git push
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

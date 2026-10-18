@@ -18,6 +18,7 @@ data/reports/*
 data/reports/app/sync.js
 !data/reports/latest.json
 !data/reports/mail_sent.txt
+!data/reports/news_digest.json
 *.parquet
 *.joblib
 

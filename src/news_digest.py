@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 import requests
 from lxml import html as lhtml
 
-from .config import ROOT, gemini_api_key
+from .config import REPORTS_DIR, ROOT, gemini_api_key
 
 KST = timezone(timedelta(hours=9))
 NEWS_PER_KEYWORD = 3
@@ -28,6 +30,7 @@ PRESS_BY_HOST = {
     "biz.chosun.com": ("조선비즈", "conservative"),
     "chosunbiz.com": ("조선비즈", "conservative"),
     "joongang.co.kr": ("중앙일보", "conservative"),
+    "joins.com": ("중앙일보", "conservative"),
     "donga.com": ("동아일보", "conservative"),
     "hankyung.com": ("한국경제", "conservative"),
     "mk.co.kr": ("매일경제", "conservative"),
@@ -66,6 +69,50 @@ PRESS_BY_HOST = {
     "bloter.net": ("블로터", "center"),
 }
 SKIP_HOSTS = ("naver.com", "google.com", "bing.com", "daum.net", "nate.com", "msn.com")
+PREFERRED_PRESS = {
+    "조선일보",
+    "조선비즈",
+    "중앙일보",
+    "동아일보",
+    "한겨레",
+    "한국경제",
+    "문화일보",
+    "국민일보",
+}
+PREFERRED_QUERY_NAMES = (
+    "조선일보",
+    "중앙일보",
+    "동아일보",
+    "한겨레",
+    "한국경제",
+    "문화일보",
+    "국민일보",
+)
+NAVER_OID_PRESS = {
+    "005": "국민일보",
+    "015": "한국경제",
+    "020": "동아일보",
+    "021": "문화일보",
+    "023": "조선일보",
+    "025": "중앙일보",
+    "028": "한겨레",
+    "032": "경향신문",
+    "009": "매일경제",
+    "001": "연합뉴스",
+}
+PREFERRED_OIDS = ("023", "025", "020", "028", "015", "021", "005")
+PRESS_HOME_URLS = (
+    "https://www.chosun.com/",
+    "https://www.joongang.co.kr/",
+    "https://www.donga.com/",
+    "https://www.hani.co.kr/",
+    "https://www.hankyung.com/",
+    "https://www.munhwa.com/",
+    "https://www.kmib.co.kr/",
+)
+DIGEST_PATH = REPORTS_DIR / "news_digest.json"
+_VIEW_RE = re.compile(r"([0-9][0-9,]*)\s*(?:회|명|view)", re.I)
+_OID_RE = re.compile(r"/article/(\d{3})/", re.I)
 _UA = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -75,6 +122,9 @@ _UA = {
     "Referer": "https://www.naver.com/",
 }
 _CACHE: dict[str, list[dict[str, Any]]] = {}
+_DIGEST: dict[str, Any] | None = None
+_RANKING_POOL: list[dict[str, Any]] | None = None
+_HOME_POOL: list[dict[str, Any]] | None = None
 
 
 def kst_today() -> str:
@@ -174,16 +224,56 @@ def _split_keywords(raw: Any) -> list[str]:
 
 
 def fetch_hot_news(keyword: str, limit: int = NEWS_PER_KEYWORD) -> list[dict[str, Any]]:
-    cached = _CACHE.get(keyword)
-    if cached is not None:
+    cached = _digest_articles(keyword)
+    if cached:
         return cached[:limit]
-    articles = _fetch_naver_news(keyword)
-    if len(articles) < 12:
-        articles = _merge_unique(articles, _fetch_bing_news(keyword))
-    articles = _select_balanced(articles, limit)
-    _fill_summaries(articles)
+    mem = _CACHE.get(keyword)
+    if mem is not None:
+        return mem[:limit]
+    articles = _collect_keyword_news(keyword, limit)
     _CACHE[keyword] = articles
     return articles
+
+
+def collect_morning_digest(force: bool | None = None) -> Path:
+    """평일 06:30 기준으로 조회수·상단 노출 뉴스를 모아 저장합니다."""
+    global _DIGEST, _CACHE
+    if force is None:
+        force = os.getenv("TED_NEWS_FORCE", "").strip().lower() in {"1", "true", "yes", "on"}
+    existing = _load_digest(allow_stale=True)
+    if (
+        not force
+        and existing.get("asof") == kst_today()
+        and isinstance(existing.get("keywords"), dict)
+        and existing["keywords"]
+    ):
+        print(f"이미 {existing['asof']} 뉴스 스냅샷이 있어 재수집하지 않습니다.")
+        return DIGEST_PATH
+    ranking = _ranking_pool()
+    homepage = _homepage_pool()
+    print(f"랭킹 {len(ranking)}건, 언론사 상단 {len(homepage)}건")
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for sub in load_subscribers():
+        for _cat, word in sub.get("items") or []:
+            key = word.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            keywords.append(word)
+    digest = {
+        "asof": kst_today(),
+        "collected_at": datetime.now(KST).isoformat(timespec="minutes"),
+        "keywords": {},
+    }
+    for word in keywords:
+        digest["keywords"][word] = _collect_keyword_news(word, NEWS_PER_KEYWORD)
+        print(f"  {word}: {len(digest['keywords'][word])}건")
+    DIGEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DIGEST_PATH.write_text(json.dumps(digest, ensure_ascii=False, indent=2), encoding="utf-8")
+    _DIGEST = digest
+    _CACHE = {word: rows for word, rows in digest["keywords"].items()}
+    return DIGEST_PATH
 
 
 def build_html(subscriber: dict[str, Any], asof_ko: str | None = None) -> str:
@@ -266,22 +356,343 @@ def _fetch_naver_news(keyword: str) -> list[dict[str, Any]]:
     urls = [
         f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_opt&sort=0&nso=so:r,p:1d",
         f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_opt&sort=0",
-        f"https://search.naver.com/search.naver?where=news&query={quote(keyword + ' 한겨레')}&sm=tab_opt&sort=0&nso=so:r,p:1d",
-        f"https://search.naver.com/search.naver?where=news&query={quote(keyword + ' 조선일보')}&sm=tab_opt&sort=0&nso=so:r,p:1d",
-        f"https://search.naver.com/search.naver?where=news&query={quote(keyword + ' 경향신문')}&sm=tab_opt&sort=0&nso=so:r,p:1d",
-        f"https://search.naver.com/search.naver?where=news&query={quote(keyword + ' 중앙일보')}&sm=tab_opt&sort=0&nso=so:r,p:1d",
     ]
     articles: list[dict[str, Any]] = []
     for url in urls:
-        try:
-            resp = requests.get(url, timeout=20, headers=_UA)
-            resp.raise_for_status()
-        except requests.RequestException:
-            continue
-        parsed = _parse_naver_results(resp.text)
+        parsed = _get_naver_search(url)
+        for i, row in enumerate(parsed):
+            row["search_rank"] = min(int(row.get("search_rank") or 99), i)
         articles = _merge_unique(articles, parsed)
         time.sleep(0.15)
-    return articles[:30]
+    have = {row.get("source") for row in articles}
+    for press in PREFERRED_QUERY_NAMES:
+        if press in have:
+            continue
+        parsed = _get_naver_search(
+            "https://search.naver.com/search.naver?where=news&query="
+            f"{quote(keyword + ' ' + press)}&sm=tab_opt&sort=0&nso=so:r,p:1d"
+        )
+        articles = _merge_unique(articles, parsed)
+        have = {row.get("source") for row in articles}
+        time.sleep(0.12)
+    return articles[:40]
+
+
+def _get_naver_search(url: str) -> list[dict[str, Any]]:
+    try:
+        resp = requests.get(url, timeout=20, headers=_UA)
+        resp.raise_for_status()
+    except requests.RequestException:
+        return []
+    return _parse_naver_results(resp.text)
+
+
+def _digest_articles(keyword: str) -> list[dict[str, Any]]:
+    keywords = _load_digest().get("keywords")
+    if not isinstance(keywords, dict):
+        return []
+    rows = keywords.get(keyword)
+    if not isinstance(rows, list):
+        for key, value in keywords.items():
+            if str(key).casefold() == keyword.casefold() and isinstance(value, list):
+                rows = value
+                break
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, dict) and row.get("title") and row.get("url")]
+
+
+def _load_digest(allow_stale: bool = False) -> dict[str, Any]:
+    global _DIGEST
+    if _DIGEST is not None and not allow_stale:
+        return _DIGEST
+    if not DIGEST_PATH.exists():
+        _DIGEST = {}
+        return _DIGEST
+    try:
+        data = json.loads(DIGEST_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        _DIGEST = {}
+        return _DIGEST
+    if not isinstance(data, dict):
+        _DIGEST = {}
+        return _DIGEST
+    if not allow_stale and data.get("asof") != kst_today():
+        _DIGEST = {}
+        return _DIGEST
+    _DIGEST = data
+    return _DIGEST
+
+
+def _collect_keyword_news(keyword: str, limit: int) -> list[dict[str, Any]]:
+    articles = _fetch_naver_news(keyword)
+    articles = _merge_unique(articles, _keyword_hits(_ranking_pool(), keyword, unwrap=True))
+    articles = _merge_unique(articles, _keyword_hits(_homepage_pool(), keyword, unwrap=False))
+    if len(articles) < 12:
+        articles = _merge_unique(articles, _fetch_bing_news(keyword))
+    for i, row in enumerate(articles):
+        row["score"] = _news_score(row, i)
+    articles.sort(key=lambda row: int(row.get("score") or 0), reverse=True)
+    picked = _select_balanced(articles, limit)
+    _fill_summaries(picked)
+    return picked
+
+
+def _keyword_hits(pool: list[dict[str, Any]], keyword: str, unwrap: bool) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for row in pool:
+        title = str(row.get("title") or "")
+        if not _matches_keyword(title, keyword):
+            continue
+        item = dict(row)
+        url = str(item.get("url") or "")
+        if unwrap:
+            url = _unwrap_naver_article(url)
+            item["url"] = url
+        host = (urlparse(url).hostname or "").lower()
+        if any(skip in host for skip in SKIP_HOSTS):
+            continue
+        name, lean = _press_info(host)
+        if item.get("source") in PREFERRED_PRESS:
+            name = item.get("source") or name
+            lean = _lean_for_press(name) or lean
+        item["source"] = name
+        item["lean"] = lean
+        item["press_key"] = name
+        item.setdefault("snippet", "")
+        item.setdefault("summary", [])
+        out.append(item)
+        if len(out) >= 8:
+            break
+    return out
+
+
+def _matches_keyword(title: str, keyword: str) -> bool:
+    text = re.sub(r"\s+", "", title).casefold()
+    key = re.sub(r"\s+", "", keyword).casefold()
+    if not key:
+        return False
+    return key in text
+
+
+def _lean_for_press(name: str) -> str:
+    for _host, (press, lean) in PRESS_BY_HOST.items():
+        if press == name:
+            return lean
+    return "center"
+
+
+def _news_score(row: dict[str, Any], search_index: int) -> int:
+    source = str(row.get("source") or "")
+    if source in PREFERRED_PRESS:
+        score = 100
+    elif source and source != "언론" and len(source) > 1:
+        score = 45
+    else:
+        score = 15
+    views = int(row.get("views") or 0)
+    rank = int(row.get("rank_pos") or 0)
+    if views:
+        score += min(views // 1500, 80)
+    if rank:
+        score += max(0, (20 - rank) * 8)
+    if row.get("from_ranking"):
+        score += 160
+    if row.get("from_home"):
+        score += 120 + max(0, (12 - int(row.get("home_pos") or 12)) * 6)
+    matched = _best_pool_match(row, _ranking_pool())
+    if matched:
+        score += 160
+        score += min(int(matched.get("views") or 0) // 1500, 80)
+        score += max(0, (20 - int(matched.get("rank_pos") or 20)) * 8)
+    home = _best_pool_match(row, _homepage_pool())
+    if home:
+        score += 110 + max(0, (12 - int(home.get("home_pos") or 12)) * 6)
+    score += max(0, 35 - int(row.get("search_rank") or search_index))
+    return score
+
+
+def _best_pool_match(row: dict[str, Any], pool: list[dict[str, Any]]) -> dict[str, Any] | None:
+    title = str(row.get("title") or "")
+    url = str(row.get("url") or "")
+    source = str(row.get("source") or "")
+    best: dict[str, Any] | None = None
+    for item in pool:
+        if url and url == item.get("url"):
+            return item
+        if source and item.get("source") == source and _too_similar(title, str(item.get("title") or "")):
+            return item
+        if _too_similar(title, str(item.get("title") or "")):
+            best = best or item
+    return best
+
+
+def _ranking_pool() -> list[dict[str, Any]]:
+    global _RANKING_POOL
+    if _RANKING_POOL is not None:
+        return _RANKING_POOL
+    stamp = datetime.now(KST).strftime("%Y%m%d")
+    urls = [f"https://news.naver.com/main/ranking/popularDay.naver?date={stamp}"]
+    urls.extend(f"https://media.naver.com/press/{oid}/ranking?type=popular&date={stamp}" for oid in PREFERRED_OIDS)
+    pool: list[dict[str, Any]] = []
+    for url in urls:
+        pool = _merge_unique(pool, _parse_ranking_page(url))
+        time.sleep(0.12)
+    _RANKING_POOL = pool
+    return pool
+
+
+def _homepage_pool() -> list[dict[str, Any]]:
+    global _HOME_POOL
+    if _HOME_POOL is not None:
+        return _HOME_POOL
+    pool: list[dict[str, Any]] = []
+    for url in PRESS_HOME_URLS:
+        pool = _merge_unique(pool, _parse_press_home(url))
+        time.sleep(0.12)
+    _HOME_POOL = pool
+    return pool
+
+
+def _parse_ranking_page(url: str) -> list[dict[str, Any]]:
+    try:
+        resp = requests.get(url, timeout=20, headers=_UA)
+        resp.raise_for_status()
+    except requests.RequestException:
+        return []
+    try:
+        doc = lhtml.fromstring(resp.text)
+    except Exception:  # noqa: BLE001
+        return []
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    rank = 0
+    for anchor in doc.xpath("//a[@href]"):
+        href = _clean_url(anchor.get("href") or "")
+        title = " ".join((anchor.text_content() or "").split())
+        title = _clean_headline(title)
+        if len(title) < 8:
+            continue
+        if href.startswith("/"):
+            parsed = urlparse(url)
+            href = f"{parsed.scheme}://{parsed.netloc}{href}"
+        host = (urlparse(href).hostname or "").lower()
+        oid_match = _OID_RE.search(href)
+        press = NAVER_OID_PRESS.get(oid_match.group(1)) if oid_match else ""
+        if not press:
+            if any(skip in host for skip in SKIP_HOSTS):
+                continue
+            press, _lean = _press_info(host)
+        key = _norm_title(title)
+        if key in seen:
+            continue
+        seen.add(key)
+        rank += 1
+        parent = " ".join((anchor.getparent().text_content() if anchor.getparent() is not None else "")[:80].split())
+        items.append(
+            {
+                "title": title,
+                "url": href,
+                "source": press,
+                "lean": _lean_for_press(press),
+                "press_key": press,
+                "snippet": "",
+                "summary": [],
+                "views": _parse_views(parent),
+                "rank_pos": rank,
+                "from_ranking": True,
+            }
+        )
+        if rank >= 40:
+            break
+    return items
+
+
+def _parse_press_home(url: str) -> list[dict[str, Any]]:
+    try:
+        resp = requests.get(url, timeout=12, headers=_UA)
+        resp.raise_for_status()
+    except requests.RequestException:
+        return []
+    try:
+        doc = lhtml.fromstring(resp.text)
+    except Exception:  # noqa: BLE001
+        return []
+    host = (urlparse(url).hostname or "").lower()
+    name, lean = _press_info(host)
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for anchor in doc.xpath("//a[@href]"):
+        href = _clean_url(anchor.get("href") or "")
+        title = _clean_headline(" ".join((anchor.text_content() or "").split()))
+        if href.startswith("/"):
+            parsed = urlparse(url)
+            href = _clean_url(f"{parsed.scheme}://{parsed.netloc}{href}")
+        link_host = (urlparse(href).hostname or "").lower()
+        if not href.startswith("http") or len(title) < 10:
+            continue
+        if any(skip in link_host for skip in SKIP_HOSTS):
+            continue
+        link_name, _link_lean = _press_info(link_host)
+        if link_name != name:
+            continue
+        key = _norm_title(title)
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(
+            {
+                "title": title,
+                "url": href,
+                "source": name,
+                "lean": lean,
+                "press_key": name,
+                "snippet": "",
+                "summary": [],
+                "home_pos": len(items) + 1,
+                "from_home": True,
+            }
+        )
+        if len(items) >= 12:
+            break
+    return items
+
+
+def _parse_views(text: str) -> int:
+    match = _VIEW_RE.search(text or "")
+    if not match:
+        return 0
+    try:
+        return int(match.group(1).replace(",", ""))
+    except ValueError:
+        return 0
+
+
+def _unwrap_naver_article(url: str) -> str:
+    host = (urlparse(url).hostname or "").lower()
+    if "naver.com" not in host:
+        return url
+    try:
+        resp = requests.get(url, timeout=10, headers={**_UA, "Referer": "https://news.naver.com/"}, allow_redirects=True)
+        resp.raise_for_status()
+    except requests.RequestException:
+        return url
+    final = _clean_url(str(resp.url or url))
+    if "naver.com" not in (urlparse(final).hostname or "").lower():
+        return final
+    text = resp.text[:180000]
+    for pat in (
+        r'property=["\']og:url["\'][^>]*content=["\']([^"\']+)',
+        r'content=["\']([^"\']+)["\'][^>]*property=["\']og:url["\']',
+        r'href=["\'](https?://(?!n\.news\.naver\.com)[^"\']+)["\'][^>]*class=["\'][^"\']*media_end_head_origin',
+    ):
+        match = re.search(pat, text, re.I)
+        if not match:
+            continue
+        found = _clean_url(html.unescape(match.group(1)))
+        if found.startswith("http") and "naver.com" not in (urlparse(found).hostname or "").lower():
+            return found
+    return url
 
 
 def _parse_naver_results(page: str) -> list[dict[str, Any]]:
@@ -320,6 +731,7 @@ def _parse_naver_results(page: str) -> list[dict[str, Any]]:
                 "press_key": name,
                 "snippet": title if len(title) > 80 else "",
                 "summary": [],
+                "search_rank": len(items),
             }
         )
     return items
@@ -633,3 +1045,20 @@ def _gemini_summaries(articles: list[dict[str, Any]]) -> dict[int, list[str]]:
         if len(cleaned) >= 3:
             out[idx] = cleaned[:3]
     return out
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="키워드 뉴스 스냅샷")
+    parser.add_argument("--collect", action="store_true", help="오전 뉴스 스냅샷을 수집합니다.")
+    args = parser.parse_args()
+    if args.collect:
+        path = collect_morning_digest()
+        print(f"뉴스 수집 완료: {path}")
+        return
+    raise SystemExit("사용법: python -m src.news_digest --collect")
+
+
+if __name__ == "__main__":
+    main()
