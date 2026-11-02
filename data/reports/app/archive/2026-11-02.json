@@ -17,7 +17,7 @@
       },
       {
         "label": "원/달러",
-        "value": "1338.7"
+        "value": "1338.2"
       }
     ],
     "paragraphs": [
@@ -30,10 +30,10 @@
     ]
   },
   "weights": {
-    "gold": 0.2692,
-    "bitcoin": 0.2388,
-    "kospi": 0.1131,
-    "kosdaq": 0.1131,
-    "nasdaq": 0.2659
+    "gold": 0.2673,
+    "bitcoin": 0.244,
+    "kospi": 0.1123,
+    "kosdaq": 0.1123,
+    "nasdaq": 0.2641
   }
 }
