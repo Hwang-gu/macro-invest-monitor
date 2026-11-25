@@ -30,10 +30,10 @@
     ]
   },
   "weights": {
-    "gold": 0.2001,
-    "bitcoin": 0.1618,
-    "kospi": 0.1618,
-    "kosdaq": 0.2192,
-    "nasdaq": 0.2572
+    "gold": 0.2007,
+    "bitcoin": 0.1631,
+    "kospi": 0.1631,
+    "kosdaq": 0.2136,
+    "nasdaq": 0.2594
   }
 }
